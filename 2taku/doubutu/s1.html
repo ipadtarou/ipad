@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>クイズ</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+    }
+    #quizContainer {
+      width: 100vw;
+      max-width: 100vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-top: 0;
+    }
+    #question {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 90vw;
+      margin: 2vw 0 4vw 0;
+      min-height: 10vw;
+    }
+    #questionText {
+      font-size: 5vw;
+      font-weight: bold;
+      background: #fff;
+      padding: 2vw 4vw;
+      border-radius: 2vw;
+      box-shadow: 0 0 0 0.5vw #000;
+      z-index: 2;
+      position: relative;
+      display: inline-block;
+      line-height: 1.2;
+    }
+    #questionText.speaking {
+      animation: speak-bounce 0.7s ease-in-out;
+    }
+    @keyframes speak-bounce {
+      0% { transform: scale(1); }
+      20% { transform: scale(1.15); }
+      50% { transform: scale(0.95); }
+      80% { transform: scale(1.10); }
+      100% { transform: scale(1); }
+    }
+    .options {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 4vw;
+      width: 90vw;
+      max-width: 900px;
+      min-width: 220px;
+      margin: 0 auto;
+      flex-wrap: nowrap;
+      overflow-x: visible;
+      box-sizing: border-box;
+    }
+    .option-img {
+      flex: 1 1 0;
+      width: 48%;
+      height: auto;
+      aspect-ratio: 16/9;
+      max-width: 420px;
+      min-width: 80px;
+      margin: 0;
+      cursor: pointer;
+      border: 0.7vw solid #000;
+      border-radius: 2vw;
+      object-fit: contain;
+      background: #fff;
+      box-sizing: border-box;
+      transition: transform 0.2s;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-drag: none;
+      display: block;
+    }
+    .zoom {
+      transform: scale(1.2);
+    }
+    #speakBtn {
+      margin-left: 2vw;
+      font-size: 6vw;
+      background: #fff;
+      border: 1vw solid #000;
+      border-radius: 50%;
+      width: 10vw;
+      height: 10vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    #speakBtn.speaking {
+      animation: mic-bounce 0.4s cubic-bezier(.4,2,.6,1);
+    }
+    @keyframes mic-bounce {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.25); }
+      100% { transform: scale(1); }
+    }
+    #resultImg {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 80vw;
+      max-height: 80vh;
+      z-index: 9999;
+    }
+    @media (max-width: 900px) {
+      #questionText {
+        font-size: 6vw;
+      }
+      .options {
+        flex-wrap: nowrap;
+      }
+      .option-img {
+        width: 80vw;
+        height: 45vw;
+        max-width: 98vw;
+        max-height: 54vw;
+        min-width: 80px;
+        min-height: 40px;
+      }
+    }
+    @media (max-width: 600px) {
+      #questionText {
+        font-size: 8vw;
+      }
+      .options {
+        width: 98vw;
+        max-width: 100vw;
+        gap: 2vw;
+      }
+      .option-img {
+        max-width: 100vw;
+        min-width: 40px;
+      }
+      #speakBtn {
+        font-size: 8vw;
+        width: 10vw;
+        height: 10vw;
+      }
+    }
+    html, body {
+      overscroll-behavior: none;
+      touch-action: none;
+      -ms-touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-user-drag: none;
+    }
+    body {
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+<div id="quizContainer">
+  <div id="question">
+    <span id="questionText"></span>
+    <button id="speakBtn"><span aria-label="マイク" role="img">🎤</span></button>
+  </div>
+  <div id="options" class="options"></div>
+  <audio id="correctAudio" src="audio/seikai.mp3"></audio>
+  <audio id="incorrectAudio" src="audio/matigai.mp3"></audio>
+  <img id="resultImg" src="images/seikai.gif" alt="正解画像">
+</div>
+
+<script>
+  const questions = [
+    "いぬ　は どれ？", "ねこ　は どれ？", "らいおん　は どれ？",
+    "きりん　は どれ？", "うさぎ　は どれ？", "ぱんだ　は どれ？",
+    "くま　は どれ？", "うし　は どれ？", "ごりら　は どれ？",
+    "うま　は どれ？"
+  ];
+
+  let currentQuestion = 0;
+  let usedQuestions = [];
+  let optionImgElems = [];
+
+  function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  function loadQuestion() {
+    if (usedQuestions.length === 10) {
+      document.getElementById("quizContainer").innerHTML = "<h2>10もんおわり！これでどうぶつはかせだね！！</h2>";
+      return;
+    }
+    let qNum;
+    do {
+      qNum = Math.floor(Math.random() * 10);
+    } while (usedQuestions.includes(qNum));
+    usedQuestions.push(qNum);
+    currentQuestion = qNum;
+    document.getElementById("questionText").textContent = questions[qNum];
+    const correctImg = (qNum + 1) + ".jpg";
+    let wrongNum;
+    do {
+      wrongNum = Math.floor(Math.random() * 10);
+    } while (wrongNum === qNum);
+    const wrongImg = (wrongNum + 1) + ".jpg";
+    const options = [
+      {img: correctImg, isCorrect: true},
+      {img: wrongImg, isCorrect: false}
+    ];
+    shuffleArray(options);
+    const optionsContainer = document.getElementById("options");
+    optionsContainer.innerHTML = "";
+    optionImgElems = [];
+    options.forEach(option => {
+      const optionImg = document.createElement("img");
+      optionImg.src = "images/" + option.img;
+      optionImg.alt = "Option";
+      optionImg.className = "option-img";
+      optionImg.draggable = false;
+      optionImg.oncontextmenu = (e) => e.preventDefault();
+      optionImg.onmousedown = (e) => { if (e.button === 2) e.preventDefault(); };
+      optionImg.ontouchstart = (e) => { if (e.touches.length > 1) e.preventDefault(); };
+      optionImg.onclick = () => checkAnswer(option.isCorrect, optionImg);
+      optionImg.onload = () => {
+        const imgs = document.querySelectorAll('.option-img');
+        let maxH = 0;
+        imgs.forEach(img => { if (img.naturalHeight > maxH) maxH = img.naturalHeight; });
+        imgs.forEach(img => { img.style.height = maxH + 'px'; });
+      };
+      optionsContainer.appendChild(optionImg);
+      optionImgElems.push(optionImg);
+    });
+  }
+
+  function checkAnswer(isCorrect, imgElem) {
+    imgElem.classList.add("zoom");
+    setTimeout(() => {
+      imgElem.classList.remove("zoom");
+      if (isCorrect) {
+        document.getElementById("correctAudio").play();
+        document.getElementById("resultImg").style.display = "block";
+        setTimeout(() => {
+          document.getElementById("resultImg").style.display = "none";
+          loadQuestion();
+        }, 2000);
+      } else {
+        document.getElementById("incorrectAudio").play();
+      }
+    }, 200);
+  }
+
+  document.getElementById('speakBtn').onclick = function() {
+    const textElem = document.getElementById('questionText');
+    const btnElem = document.getElementById('speakBtn');
+    const text = textElem.textContent;
+    if ('speechSynthesis' in window) {
+      btnElem.classList.add('speaking');
+      setTimeout(() => { btnElem.classList.remove('speaking'); }, 400);
+      setTimeout(() => {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'ja-JP';
+        utter.onstart = function() {
+          textElem.classList.add('speaking');
+        };
+        utter.onend = function() {
+          textElem.classList.remove('speaking');
+        };
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utter);
+      }, 1000);
+    }
+  };
+
+  // 左右クリックによる画像選択。ただしマイクボタンは無視
+  document.addEventListener('mousedown', function(e) {
+    if (e.target.classList && e.target.classList.contains('option-img')) return;
+    if (e.target.closest('#speakBtn')) return; // マイクを除外
+    if (!optionImgElems || optionImgElems.length !== 2) return;
+    if (e.button === 0) {
+      checkAnswer(optionImgElems[0].src.includes((currentQuestion+1)+'.jpg'), optionImgElems[0]);
+    } else if (e.button === 2) {
+      checkAnswer(optionImgElems[1].src.includes((currentQuestion+1)+'.jpg'), optionImgElems[1]);
+    }
+  });
+
+  // その他の操作制限
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('gesturechange', e => e.preventDefault());
+  document.addEventListener('gestureend', e => e.preventDefault());
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('mousedown', e => { if (e.button === 2) e.preventDefault(); });
+  document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); });
+  document.addEventListener('selectstart', e => e.preventDefault());
+  document.addEventListener('dragstart', e => e.preventDefault());
+  document.addEventListener('scroll', e => { window.scrollTo(0,0); e.preventDefault(); }, {passive:false});
+  window.addEventListener('wheel', e => e.preventDefault(), {passive:false});
+  window.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
+  window.addEventListener('resize', () => window.scrollTo(0,0));
+
+  // 最初の問題読み込み
+  loadQuestion();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/2taku/doubutu/service-worker.js')
+        .then(registration => {
+          console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        })
+        .catch(error => {
+          console.log('ServiceWorker registration failed: ', error);
+        });
+    });
+  }
+</script>
+
+</body>
+</html>

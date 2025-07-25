@@ -1,0 +1,9 @@
+{
+  "name": "クイズコピー",
+  "short_name": "クイズコピー",
+  "start_url": "./s1.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "description": "オフラインで使えるクイズコピーアプリ"
+}

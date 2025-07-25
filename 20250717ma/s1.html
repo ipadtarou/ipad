@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>マッチング課題</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      touch-action: none; /* スワイプなどのブラウザジェスチャーを無効化 */
+    }
+    #setup {
+      text-align: center;
+      padding: 20px;
+    }
+    #setup button {
+      margin: 5px;
+      padding: 8px 12px;
+      font-size: 16px;
+    }
+    #container {
+      display: none;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 1200px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .column {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .column img {
+      width: min(22vw, 100px);
+      height: auto;
+      margin: 5px;
+      user-select: none;
+      max-height: 100px;
+      touch-action: none; /* 画像上でのジェスチャーも無効化 */
+    }
+    .dropzone {
+      border: 2px dashed #999;
+    }
+    #arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      padding: 10px;
+      color: #444;
+      user-select: none;
+    }
+    #message {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #fff;
+      padding: 10px 20px;
+      border: 2px solid #000;
+      display: none;
+      font-size: 1.5rem;
+      z-index: 1001;
+    }
+    .dragging {
+      position: fixed;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.7;
+    }
+    .correct-anim {
+      animation: correct-zoom 0.5s ease-in-out;
+    }
+    .wrong-anim {
+      animation: wrong-shake 0.5s ease-in-out;
+    }
+    @keyframes correct-zoom {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.5); }
+      100% { transform: scale(1); }
+    }
+    @keyframes wrong-shake {
+      0%, 100% { transform: translateX(0); }
+      10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+      20%, 40%, 60%, 80% { transform: translateX(10px); }
+    }
+    @media (max-width: 768px) {
+      #container {
+        flex-direction: column;
+        align-items: center;
+      }
+      #arrow {
+        transform: rotate(90deg);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="setup">
+    <h2>今日は何問挑戦しますか？</h2>
+    <div id="question-buttons"></div>
+    <div id="direction-select" style="display:none;">
+      <h3>ドラッグの方向を選んでください</h3>
+      <button onclick="setDirection('left-to-right')">左 → 右</button>
+      <button onclick="setDirection('right-to-left')">右 → 左</button>
+    </div>
+    <div id="remove-select" style="display:none;">
+      <h3>正解した画像をどうしますか？</h3>
+      <button onclick="setRemoveMode(true)">消す</button>
+      <button onclick="setRemoveMode(false)">残す</button>
+    </div>
+  </div>
+
+  <div id="message"></div>
+
+  <div id="container">
+    <div id="left" class="column"></div>
+    <div id="arrow">➡</div>
+    <div id="right" class="column"></div>
+  </div>
+
+  <audio id="seikai" src="seikai.mp3"></audio>
+  <audio id="batu" src="batu.mp3"></audio>
+
+  <script>
+    const TOTAL_IMAGES = 42;
+    const MAX_SELECT = 30;
+
+    const left = document.getElementById('left');
+    const right = document.getElementById('right');
+    const container = document.getElementById('container');
+    const setup = document.getElementById('setup');
+    const questionButtons = document.getElementById('question-buttons');
+    const directionSelect = document.getElementById('direction-select');
+    const removeSelect = document.getElementById('remove-select');
+    const message = document.getElementById('message');
+    const seikaiSound = document.getElementById('seikai');
+    const batuSound = document.getElementById('batu');
+    const arrow = document.getElementById('arrow');
+
+    let questionCount = 10;
+    let direction = "left-to-right";
+    let removeOnMatch = true;
+    let selected = [];
+    let draggedItem = null;
+    let clone = null;
+
+    for (let i = 1; i <= MAX_SELECT; i++) {
+      const btn = document.createElement('button');
+      btn.textContent = i;
+      btn.onclick = () => {
+        questionCount = i;
+        questionButtons.style.display = 'none';
+        directionSelect.style.display = 'block';
+      };
+      questionButtons.appendChild(btn);
+    }
+
+    function setDirection(dir) {
+      direction = dir;
+      arrow.textContent = dir === "left-to-right" ? "➡" : "⬅";
+      directionSelect.style.display = 'none';
+      removeSelect.style.display = 'block';
+    }
+
+    function setRemoveMode(flag) {
+      removeOnMatch = flag;
+      setup.style.display = 'none';
+      startGame();
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function startGame() {
+      const allNumbers = Array.from({ length: TOTAL_IMAGES }, (_, i) => i + 1);
+      selected = shuffle(allNumbers).slice(0, questionCount);
+      container.style.display = 'flex';
+
+      const src = shuffle([...selected]);
+      const dst = shuffle([...selected]);
+
+      if (direction === "left-to-right") {
+        createImages(src, left);
+        createDropZones(dst, right);
+      } else {
+        createImages(src, right);
+        createDropZones(dst, left);
+      }
+    }
+
+    function createImages(numbers, container) {
+      numbers.forEach(num => {
+        const img = document.createElement('img');
+        img.src = `${num}.jpg`;
+        img.dataset.id = num;
+        img.classList.add('draggable');
+        img.addEventListener('pointerdown', onPointerDown);
+        container.appendChild(img);
+      });
+    }
+
+    function createDropZones(numbers, container) {
+      numbers.forEach(num => {
+        const img = document.createElement('img');
+        img.src = `${num}.jpg`;
+        img.dataset.id = num;
+        img.classList.add('dropzone');
+        container.appendChild(img);
+      });
+    }
+
+    function onPointerDown(e) {
+      // 非表示のアイテムや左クリック/タッチ以外は無視
+      if (e.button !== 0 || e.target.style.visibility === 'hidden') return;
+      draggedItem = e.target;
+
+      // ドラッグ用のクローンを作成
+      clone = draggedItem.cloneNode(true);
+      clone.classList.add('dragging');
+      document.body.appendChild(clone);
+
+      // 元のアイテムを非表示にして、直接移動しているように見せる
+      draggedItem.style.visibility = 'hidden';
+
+      moveClone(e.clientX, e.clientY);
+
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+    }
+
+    function onPointerMove(e) {
+      moveClone(e.clientX, e.clientY);
+    }
+
+    function moveClone(x, y) {
+      if (clone) {
+        clone.style.left = `${x - clone.width / 2}px`;
+        clone.style.top = `${y - clone.height / 2}px`;
+      }
+    }
+
+    function onPointerUp(e) {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+
+      if (!clone || !draggedItem) return;
+
+      // ドロップ先の要素を特定
+      clone.style.display = 'none';
+      const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+      document.body.removeChild(clone);
+      clone = null;
+
+      let isMatch = false;
+      if (dropTarget && dropTarget.classList.contains('dropzone')) {
+        const draggedId = draggedItem.dataset.id;
+        const dropId = dropTarget.dataset.id;
+
+        if (draggedId === dropId) {
+          isMatch = true;
+          handleCorrectMatch(draggedItem, dropTarget);
+        }
+      }
+
+      // マッチしなかった場合
+      if (!isMatch) {
+        handleWrongMatch(draggedItem);
+      }
+
+      draggedItem = null;
+    }
+
+    function handleCorrectMatch(dragged, dropped) {
+      showMessage("正解！", true);
+      seikaiSound.currentTime = 0;
+      seikaiSound.play();
+
+      dropped.classList.add('correct-anim');
+      dropped.addEventListener('animationend', () => {
+        dropped.classList.remove('correct-anim');
+      }, { once: true });
+
+      // ドラッグした元の画像は既に非表示になっている
+
+      // 「消す」が選択されている場合、ドロップ先の画像も非表示にする
+      if (removeOnMatch) {
+        setTimeout(() => {
+          dropped.style.visibility = 'hidden';
+        }, 500); // アニメーションが見えるように少し待つ
+      }
+
+      checkComplete();
+    }
+
+    function handleWrongMatch(dragged) {
+      showMessage("不正解", false);
+      batuSound.currentTime = 0;
+      batuSound.play();
+
+      // 元の場所に画像を再表示
+      dragged.style.visibility = 'visible';
+
+      dragged.classList.add('wrong-anim');
+      dragged.addEventListener('animationend', () => {
+        dragged.classList.remove('wrong-anim');
+      }, { once: true });
+    }
+
+    function showMessage(text, success) {
+      message.textContent = text;
+      message.style.color = success ? 'green' : 'red';
+      message.style.display = 'block';
+      setTimeout(() => message.style.display = 'none', 1000);
+    }
+
+    function checkComplete() {
+      // 表示されているドラッグ可能な画像の数を数える
+      const remainingDraggables = Array.from(document.querySelectorAll('.draggable')).filter(img => img.style.visibility !== 'hidden');
+      if (remainingDraggables.length === 0) {
+        // 少し待ってからメッセージを表示
+        setTimeout(() => {
+            showMessage("全問正解！終了です！", true);
+        }, 600);
+      }
+    }
+  </script>
+</body>
+</html>

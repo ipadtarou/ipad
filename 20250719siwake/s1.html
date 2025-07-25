@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>図形仕分けゲーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #f5f5f5;
+      overflow: hidden;
+      touch-action: none;
+    }
+    #setup-screen {
+      text-align: center;
+    }
+    #setup-screen h2 {
+      font-size: 1.5em;
+    }
+    #question-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      max-width: 90vw;
+    }
+    #question-buttons button {
+      width: 50px;
+      height: 50px;
+      font-size: 1.2em;
+      cursor: pointer;
+    }
+    #game-container {
+      display: none;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #game {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, 70px);
+      gap: 10px;
+      width: 95vw;
+      max-width: 1000px;
+      padding: 10px;
+      height: 55vh;
+      overflow-y: auto;
+      background: #fff;
+      box-sizing: border-box;
+    }
+    .draggable {
+      width: 100%;
+      touch-action: none;
+      user-select: none;
+    }
+    .draggable.selected {
+      outline: 3px solid red;
+      outline-offset: 2px;
+    }
+    #areas {
+      display: flex;
+      flex-direction: row; /* 横並びに変更 */
+      justify-content: space-around;
+      align-items: center;
+      width: 100%;
+      height: 40vh;
+      background: #f5f5f5;
+      z-index: 10;
+      box-sizing: border-box;
+      padding: 10px;
+    }
+    .dropzone {
+      border: 2px dashed #999;
+      width: 30%; /* 幅を調整 */
+      height: 80%; /* 高さを調整して縦長に */
+      margin: 5px;
+      padding: 5px;
+      text-align: center;
+      background: #e0e0e0;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+    }
+    .dropzone[data-type="m"] {
+      border-radius: 50%;
+    }
+    .dropzone[data-type="sa"] {
+      border: none;
+      background-color: #ccc;
+      clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    }
+    .dropzone[data-type="si"] {
+      border-radius: 10px;
+    }
+    .dropped {
+      width: 40px;
+      margin: 2px;
+    }
+    #endMessage {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2em;
+      color: green;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 2000;
+      display: none;
+    }
+    .shake { animation: shake 0.5s; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+      20%, 40%, 60%, 80% { transform: translateX(10px); }
+    }
+    .pop { animation: pop 0.3s ease-in-out; }
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.5); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div id="setup-screen">
+    <h2>何問やる？</h2>
+    <div id="question-buttons"></div>
+  </div>
+
+  <div id="game-container">
+    <div id="game"></div>
+    <div id="areas">
+      <div class="dropzone" data-type="m">〇エリア</div>
+      <div class="dropzone" data-type="sa">△エリア</div>
+      <div class="dropzone" data-type="si">□エリア</div>
+    </div>
+  </div>
+  
+  <div id="endMessage"></div>
+
+  <audio id="correctSound" src="seikai.mp3"></audio>
+  <audio id="wrongSound" src="batu.mp3"></audio>
+
+  <script>
+    const setupScreen = document.getElementById('setup-screen');
+    const gameContainer = document.getElementById('game-container');
+    const questionButtons = document.getElementById('question-buttons');
+    const game = document.getElementById('game');
+    const correctSound = document.getElementById('correctSound');
+    const wrongSound = document.getElementById('wrongSound');
+
+    const categories = { m: 33, sa: 24, si: 26 };
+    const allImages = [];
+    Object.keys(categories).forEach(type => {
+      for (let i = 1; i <= categories[type]; i++) {
+        allImages.push({ src: `${type}${i}.jpg`, type });
+      }
+    });
+
+    // 問題数選択ボタンを生成
+    for (let i = 1; i <= 40; i++) {
+      const button = document.createElement('button');
+      button.textContent = i;
+      button.addEventListener('click', () => {
+        setupScreen.style.display = 'none';
+        gameContainer.style.display = 'flex';
+        initGame(i);
+      });
+      questionButtons.appendChild(button);
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function initGame(totalImages) {
+      game.innerHTML = ''; // ゲームエリアをクリア
+      const images = shuffle(allImages).slice(0, totalImages);
+
+      images.forEach((imgData, idx) => {
+        const img = document.createElement('img');
+        img.src = imgData.src;
+        img.className = 'draggable';
+        img.draggable = true;
+        img.dataset.type = imgData.type;
+        img.dataset.index = idx;
+
+      // PC用ドラッグ
+      img.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', imgData.type + ',' + idx);
+        setTimeout(() => img.classList.add('selected'), 0);
+      });
+
+      img.addEventListener('dragend', () => {
+        img.classList.remove('selected');
+      });
+
+        // タッチ用ドラッグ
+        let offsetX = 0, offsetY = 0;
+        let originalWidth = 0, originalHeight = 0;
+
+      img.addEventListener('touchstart', e => {
+        if (img.dataset.moved === 'true' || e.touches.length > 1) return;
+        e.preventDefault();
+        img.classList.add('selected');
+        img.dataset.touching = 'true';
+        const touch = e.touches[0];
+        const rect = img.getBoundingClientRect();
+        
+        originalWidth = rect.width;
+        originalHeight = rect.height;
+        img.style.width = `${originalWidth}px`;
+        img.style.height = `${originalHeight}px`;
+
+        offsetX = touch.clientX - rect.left;
+        offsetY = touch.clientY - rect.top;
+        img.style.position = 'absolute';
+        img.style.zIndex = 1000;
+        img.style.pointerEvents = 'none';
+        document.body.appendChild(img);
+        moveAt(touch.clientX, touch.clientY);
+      }, { passive: false });
+
+        img.addEventListener('touchmove', e => {
+          if (img.dataset.touching !== 'true' || e.touches.length > 1) return;
+          e.preventDefault();
+          const touch = e.touches[0];
+          moveAt(touch.clientX, touch.clientY);
+        }, { passive: false });
+
+      img.addEventListener('touchend', e => {
+        if (img.dataset.touching !== 'true') return;
+        e.preventDefault();
+        img.classList.remove('selected');
+        img.dataset.touching = 'false';
+        img.style.pointerEvents = '';
+        
+        const touch = e.changedTouches[0];
+          const dropzones = document.querySelectorAll('.dropzone');
+          let dropped = false;
+
+          dropzones.forEach(zone => {
+            if (isInside(touch.clientX, touch.clientY, zone)) {
+              handleDrop(zone, img, img.dataset.type);
+              dropped = true;
+            }
+          });
+
+          if (!dropped) {
+            game.appendChild(img);
+            img.style.position = '';
+            img.style.left = '';
+            img.style.top = '';
+            img.style.width = '';
+            img.style.height = '';
+            img.style.zIndex = '';
+          }
+        });
+
+        function moveAt(x, y) {
+          img.style.left = (x - offsetX) + 'px';
+          img.style.top = (y - offsetY) + 'px';
+        }
+
+        game.appendChild(img);
+      });
+
+      document.querySelectorAll('.dropzone').forEach(zone => {
+        zone.addEventListener('dragover', e => e.preventDefault());
+        zone.addEventListener('drop', e => {
+          e.preventDefault();
+          const [type, index] = e.dataTransfer.getData('text/plain').split(',');
+          const img = document.querySelector(`img[data-index='${index}']`);
+          handleDrop(zone, img, type);
+        });
+      });
+    }
+
+    function handleDrop(zone, img, type) {
+      if (!img || img.dataset.moved === 'true') return;
+
+      if (zone.dataset.type === type) {
+        correctSound.play();
+        img.classList.add('pop');
+        img.addEventListener('animationend', () => {
+          img.classList.remove('pop');
+          img.className = 'dropped';
+          img.style.position = '';
+          img.style.left = '';
+          img.style.top = '';
+          img.style.width = '';
+          img.style.height = '';
+          img.style.zIndex = '';
+          zone.appendChild(img);
+          img.dataset.moved = 'true';
+          checkEnd();
+        }, { once: true });
+      } else {
+        wrongSound.play();
+        img.classList.add('shake');
+        img.addEventListener('animationend', () => {
+          img.classList.remove('shake');
+          game.appendChild(img);
+          img.style.position = '';
+          img.style.left = '';
+          img.style.top = '';
+          img.style.width = '';
+          img.style.height = '';
+          img.style.zIndex = '';
+        }, { once: true });
+      }
+    }
+
+    function isInside(x, y, zone) {
+      const rect = zone.getBoundingClientRect();
+      const type = zone.dataset.type;
+
+      if (type === 'si') {
+        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+      } else if (type === 'm') {
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const radius = Math.min(rect.width, rect.height) / 2;
+        const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+        return distance <= radius;
+      } else if (type === 'sa') {
+        const p1 = { x: rect.left + rect.width / 2, y: rect.top };
+        const p2 = { x: rect.left, y: rect.top + rect.height };
+        const p3 = { x: rect.right, y: rect.top + rect.height };
+        
+        const d1 = (x - p2.x) * (p1.y - p2.y) - (p1.x - p2.x) * (y - p2.y);
+        const d2 = (x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (y - p3.y);
+        const d3 = (x - p1.x) * (p3.y - p1.y) - (p3.x - p1.x) * (y - p1.y);
+
+        const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+        const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+        return !(has_neg && has_pos);
+      }
+      return false;
+    }
+
+    function checkEnd() {
+      const remaining = [...document.querySelectorAll('.draggable')].filter(img => !img.dataset.moved);
+      if (remaining.length === 0) {
+        const endMessage = document.getElementById('endMessage');
+        endMessage.textContent = '終了しました！';
+        endMessage.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>

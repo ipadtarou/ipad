@@ -1,0 +1,9 @@
+{
+  "name": "きょうのたのしいべんきょうクイズ",
+  "short_name": "クイズ",
+  "start_url": "./s1.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "description": "オフラインで使えるクイズアプリ"
+}
