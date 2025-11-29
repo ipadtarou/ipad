@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>さくらんぼ算その２</title>
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Arial Rounded MT", sans-serif;
+  background: #fffaf0;
+  overflow: hidden;
+  user-select: none; /* Disable text selection */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+.screen {
+  display: none;
+  width: 100%;
+  height: 100vh;
+  position: relative;
+}
+.active {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+#selectScreen {
+  background: #fff0f5;
+}
+.select-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 100px);
+  gap: 20px;
+}
+.select-btn {
+  background: #ffe4e1;
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  font-size: 36px;
+  border: 2px solid #ff9999;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.select-btn:hover {
+  background: #ffcccc;
+  transform: scale(1.05);
+}
+#quizScreen {
+  background: #fafad2;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  position: relative; /* Added for SVG positioning */
+}
+#problem {
+  font-size: 110px;
+  margin-top: 50px;
+  text-align: center;
+  position: relative;
+}
+#answerBox {
+  display: inline-block;
+  width: 120px;
+  height: 100px;
+  border: 5px solid #333;
+  vertical-align: middle;
+  font-size: 70px;
+  text-align: center;
+  line-height: 100px;
+  background: #fff;
+}
+#cherryArea {
+  position: relative;
+  margin-top: 40px;
+  width: 500px;
+  height: 220px;
+}
+.cherry {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #ffb6c1;
+  border: 3px solid #ff69b4;
+  font-size: 50px;
+  text-align: center;
+  line-height: 90px;
+}
+#cherryLeft { left: 120px; top: 100px; }
+#cherryRight { right: 120px; top: 100px; }
+
+.swap-animation-left {
+  animation: swap-left 0.8s ease-in-out forwards;
+}
+.swap-animation-right {
+  animation: swap-right 0.8s ease-in-out forwards;
+}
+
+@keyframes swap-left {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(130px, 0) scale(1.2); }
+  100% { transform: translate(260px, 0); }
+}
+
+@keyframes swap-right {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(-130px, 0) scale(1.2); }
+  100% { transform: translate(-260px, 0); }
+}
+
+#panelArea {
+  position: absolute;
+  bottom: 40px;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 8px;
+  width: 90%;
+  justify-items: center;
+}
+.number {
+  background: #f5deb3;
+  border: 2px solid #cd853f;
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  font-size: 36px;
+  text-align: center;
+  line-height: 80px;
+  cursor: pointer;
+  transition: all 0.6s ease;
+  position: relative;
+}
+.number:hover {
+  background: #ffe4b5;
+}
+.slide {
+  position: absolute !important;
+  transition: all 0.6s cubic-bezier(0.25, 1.25, 0.5, 1);
+  z-index: 10;
+}
+#judgeMark {
+  font-size: 180px;
+  position: absolute;
+  top: 30%;
+  color: red;
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.5s ease;
+}
+.shake {
+  animation: shake 0.4s ease-in-out 2;
+}
+@keyframes shake {
+  0%,100% { transform: translate(0,0); }
+  25% { transform: translate(10px, 0); }
+  50% { transform: translate(-10px, 0); }
+  75% { transform: translate(8px, 0); }
+}
+</style>
+</head>
+<body>
+
+<div id="selectScreen" class="screen active">
+  <h1>問題数を選んでください</h1>
+  <div class="select-grid" id="selectGrid"></div>
+</div>
+
+<div id="quizScreen" class="screen">
+  <svg id="lineCanvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 5;"></svg>
+  <div id="problem"></div>
+  <div id="cherryArea">
+    <div class="cherry" id="cherryLeft"></div>
+    <div class="cherry" id="cherryRight"></div>
+  </div>
+  <div id="judgeMark"></div>
+  <div id="panelArea"></div>
+</div>
+
+<audio id="maru" src="maru.mp3"></audio>
+<audio id="batu" src="batu.mp3"></audio>
+<audio id="poko" src="poko.mp3"></audio>
+
+<script>
+// Disable unwanted interactions
+document.addEventListener('contextmenu', event => event.preventDefault());
+document.addEventListener('selectstart', event => event.preventDefault());
+document.addEventListener('dragstart', event => event.preventDefault());
+document.addEventListener('touchmove', function(event) {
+    if (event.touches.length > 1) {
+        event.preventDefault();
+    }
+}, { passive: false });
+
+
+const selectGrid = document.getElementById('selectGrid');
+const selectScreen = document.getElementById('selectScreen');
+const quizScreen = document.getElementById('quizScreen');
+const problemEl = document.getElementById('problem');
+const cherryLeft = document.getElementById('cherryLeft');
+const cherryRight = document.getElementById('cherryRight');
+const panelArea = document.getElementById('panelArea');
+const maru = document.getElementById('maru');
+const batu = document.getElementById('batu');
+const poko = document.getElementById('poko');
+const judgeMark = document.getElementById('judgeMark');
+
+let totalQuestions = 0;
+let currentQ = 0;
+let a, b;
+let step = 0; // 0=cherry, 1=answer
+let correctCherry = [];
+let correctAnswer = 0;
+let startTime;
+let answerBox;
+
+for (let i=1; i<=15; i++) {
+  const btn = document.createElement('button');
+  btn.className = 'select-btn';
+  btn.textContent = i;
+  btn.onclick = () => {
+    totalQuestions = i;
+    startQuiz();
+  };
+  selectGrid.appendChild(btn);
+}
+
+function startQuiz(){
+  selectScreen.classList.remove('active');
+  quizScreen.classList.add('active');
+  startTime = new Date();
+  currentQ = 0;
+  nextQuestion();
+}
+
+function nextQuestion(){
+  if(currentQ >= totalQuestions){
+    const time = ((new Date() - startTime)/1000).toFixed(1);
+    problemEl.innerHTML = `<span style="font-size:60px;">完了！${time}秒かかりました</span>`;
+    panelArea.innerHTML = "";
+    cherryLeft.textContent = "";
+    cherryRight.textContent = "";
+    return;
+  }
+
+  do {
+    a = Math.floor(Math.random() * 9) + 1;
+    b = Math.floor(Math.random() * 9) + 1;
+  } while (a + b < 11);
+
+  problemEl.innerHTML = `${a} + <span id="b_number">${b}</span> = <span id="answerBox">　</span>`;
+  answerBox = document.getElementById('answerBox');
+  
+  setTimeout(drawLines, 50); // Draw lines after elements are rendered
+
+  correctCherry = [10-a, b-(10-a)];
+  if(correctCherry[0] > correctCherry[1]) correctCherry.reverse();
+  correctAnswer = a+b;
+
+  cherryLeft.textContent = "";
+  cherryRight.textContent = "";
+  judgeMark.style.opacity = 0;
+  judgeMark.style.transform = "scale(0)";
+  step = 0;
+  showPanels(0);
+}
+
+function showPanels(mode){
+  panelArea.innerHTML = "";
+  const range = mode === 0 ? 10 : 20;
+  for(let i=0;i<range;i++){
+    const num = i;
+    const div = document.createElement('div');
+    div.className = 'number';
+    div.textContent = num;
+    div.onclick = () => clickNumber(div, num);
+    panelArea.appendChild(div);
+  }
+}
+
+function drawLines() {
+    const svg = document.getElementById('lineCanvas');
+    svg.innerHTML = ''; // Clear previous lines
+
+    const bEl = document.getElementById('b_number');
+    const cherryL = document.getElementById('cherryLeft');
+    const cherryR = document.getElementById('cherryRight');
+
+    if (!bEl || !cherryL || !cherryR) return;
+
+    const bRect = bEl.getBoundingClientRect();
+    const cherryLRect = cherryL.getBoundingClientRect();
+    const cherryRRect = cherryR.getBoundingClientRect();
+    const quizScreenRect = quizScreen.getBoundingClientRect();
+
+    const b_x = bRect.left + bRect.width / 2 - quizScreenRect.left;
+    const b_y = bRect.bottom - quizScreenRect.top;
+
+    const cl_x = cherryLRect.left + cherryLRect.width / 2 - quizScreenRect.left;
+    const cl_y = cherryLRect.top - quizScreenRect.top;
+
+    const cr_x = cherryRRect.left + cherryRRect.width / 2 - quizScreenRect.left;
+    const cr_y = cherryRRect.top - quizScreenRect.top;
+
+    const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line1.setAttribute('x1', b_x);
+    line1.setAttribute('y1', b_y);
+    line1.setAttribute('x2', cl_x);
+    line1.setAttribute('y2', cl_y);
+    line1.setAttribute('stroke', '#ff69b4');
+    line1.setAttribute('stroke-width', '3');
+    svg.appendChild(line1);
+
+    const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line2.setAttribute('x1', b_x);
+    line2.setAttribute('y1', b_y);
+    line2.setAttribute('x2', cr_x);
+    line2.setAttribute('y2', cr_y);
+    line2.setAttribute('stroke', '#ff69b4');
+    line2.setAttribute('stroke-width', '3');
+    svg.appendChild(line2);
+}
+
+function clickNumber(div, num){
+  poko.currentTime = 0;
+  poko.play();
+  const rect = div.getBoundingClientRect();
+  const clone = div.cloneNode(true);
+  clone.classList.add('slide');
+  document.body.appendChild(clone);
+  clone.style.left = rect.left + "px";
+  clone.style.top = rect.top + "px";
+
+  setTimeout(() => {
+    let target;
+    if(step === 0){
+      if(!cherryLeft.textContent) target = cherryLeft;
+      else target = cherryRight;
+    } else target = answerBox;
+
+    const tRect = target.getBoundingClientRect();
+    clone.style.left = tRect.left + "px";
+    clone.style.top = tRect.top + "px";
+    clone.style.transform = "scale(0.8)";
+    
+    setTimeout(() => {
+      clone.remove();
+      if(step === 0){
+        if(!cherryLeft.textContent) cherryLeft.textContent = num;
+        else cherryRight.textContent = num;
+
+        if(cherryLeft.textContent && cherryRight.textContent){
+          const arr = [parseInt(cherryLeft.textContent), parseInt(cherryRight.textContent)];
+          if(JSON.stringify(arr.sort((a,b)=>a-b)) === JSON.stringify(correctCherry.sort((a,b)=>a-b))){
+            maru.play();
+            
+            // Check if swapping is needed
+            if (parseInt(cherryLeft.textContent) !== (10 - a)) {
+              cherryLeft.classList.add('swap-animation-left');
+              cherryRight.classList.add('swap-animation-right');
+              
+              setTimeout(() => {
+                cherryLeft.classList.remove('swap-animation-left');
+                cherryRight.classList.remove('swap-animation-right');
+                const temp = cherryLeft.textContent;
+                cherryLeft.textContent = cherryRight.textContent;
+                cherryRight.textContent = temp;
+                
+                step = 1;
+                showPanels(1);
+              }, 800); // Match animation duration
+            } else {
+              step = 1;
+              showPanels(1);
+            }
+          } else {
+            batu.play();
+            quizScreen.classList.add("shake");
+            setTimeout(()=>quizScreen.classList.remove("shake"),400);
+            cherryLeft.textContent = "";
+            cherryRight.textContent = "";
+          }
+        }
+      } else {
+        if(num === correctAnswer){
+          maru.play();
+          answerBox.textContent = num;
+          judgeMark.textContent = "〇";
+          judgeMark.style.color = "red";
+          judgeMark.style.opacity = 1;
+          judgeMark.style.transform = "scale(1)";
+          setTimeout(()=>{ judgeMark.style.opacity=0; currentQ++; nextQuestion(); },1000);
+        } else {
+          batu.play();
+          judgeMark.textContent = "×";
+          judgeMark.style.color = "blue";
+          judgeMark.style.opacity = 1;
+          judgeMark.style.transform = "scale(1)";
+          quizScreen.classList.add("shake");
+          setTimeout(()=>{
+            judgeMark.style.opacity=0;
+            judgeMark.style.transform="scale(0)";
+            quizScreen.classList.remove("shake");
+            problemEl.querySelector("#answerBox").textContent="";
+          },1000);
+        }
+      }
+    },600);
+  },50);
+}
+</script>
+</body>
+</html>

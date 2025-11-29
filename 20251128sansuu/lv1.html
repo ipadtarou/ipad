@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>しかくカウント</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
+  <style>
+    body { margin:0; overflow:hidden; background:#f0f0f0; }
+    #container { position:relative; width:100vw; height:100vh; }
+    .sikaku {
+      position:absolute; width:64px; height:64px; transition:transform 0.15s; cursor:pointer;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+    }
+    .num {
+      position:absolute; left:0; width:100%; bottom:4px; text-align:center; font-size:1.4em; font-weight:bold; color:#fff; text-shadow:0 0 4px #000,0 0 2px #000; pointer-events:none; line-height:1.1;
+    }
+    .furigana {
+      position:absolute; left:0; width:100%; bottom:28px; text-align:center; font-size:0.9em; color:#fff; font-weight:normal; text-shadow:0 0 4px #000,0 0 2px #000; letter-spacing:0.08em; pointer-events:none; white-space:nowrap; background:none; border:none; padding:0; line-height:1.1; }
+    #counter {
+      position:fixed; right:24px; bottom:24px; background:#fff; border-radius:24px; padding:24px 70px; font-size:8em; box-shadow:0 2px 30px #0003; min-width:2em; min-height:1.2em; display:flex; align-items:center; justify-content:center; user-select:none; z-index:10;
+    }
+    #counter .fuse {
+      display:inline-block; width:2.2em; height:1.5em; background:rgba(180,180,180,0.35); border-radius:0.3em; margin:0 0.12em; vertical-align:middle;
+    }
+    #matome-btn {
+      position:fixed; right:24px; bottom:calc(24px + 8em); z-index:20; font-size:2em; padding:0.5em 1.5em; border-radius:1em; border:none; background:#4af; color:#fff; font-weight:bold; box-shadow:0 2px 8px #0002; display:none; }
+    #counter.writing { outline:2px solid #4af; }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <div id="counter">0</div>
+  <button id="answer-btn" style="position:fixed;right:24px;bottom:8px;z-index:30;font-size:2em;padding:0.5em 1.5em;border-radius:1em;border:none;background:#f80;color:#fff;font-weight:bold;box-shadow:0 2px 8px #0002;display:none;">解答</button>
+  <div id="quiz-result" style="position:fixed;right:24px;bottom:calc(24px + 13em);z-index:41;font-size:2em;font-weight:bold;color:#222;background:#fff8;border-radius:1em;padding:0.5em 1.5em;display:none;pointer-events:none;"></div>
+  <canvas id="answer-mark" style="position:fixed;right:24px;bottom:24px;z-index:42;pointer-events:none;" width="180" height="180"></canvas>
+  <audio id="se" src="sikaku.png/../p.mp3"></audio>
+  <audio id="seikai-audio" src="seikai.mp3"></audio>
+  <audio id="hazure-audio" src="hazure.mp3"></audio>
+  <button id="reset-btn" style="position:fixed;left:24px;top:24px;z-index:50;font-size:1.5em;padding:0.4em 1.2em;border-radius:1em;border:none;background:#eee;color:#333;font-weight:bold;box-shadow:0 2px 8px #0002;">リセット</button>
+  <button id="auto10-btn" style="position:fixed;left:180px;top:24px;z-index:50;font-size:1.5em;padding:0.4em 1.2em;border-radius:1em;border:none;background:#4af;color:#fff;font-weight:bold;box-shadow:0 2px 8px #0002;">自動10まとめ</button>
+  <script>
+    // スワイプによるページ更新（pull-to-refresh）を禁止
+    let touchStartY = 0;
+    window.addEventListener('touchstart', function(e) {
+      if(e.touches.length === 1) {
+        touchStartY = e.touches[0].clientY;
+      }
+    }, {passive:false});
+    window.addEventListener('touchmove', function(e) {
+      if(e.touches.length === 1) {
+        const deltaY = e.touches[0].clientY - touchStartY;
+        if(deltaY > 10 && window.scrollY === 0) {
+          e.preventDefault();
+        }
+      }
+    }, {passive:false});
+    const NUM_TOTAL = 20;
+    const NUM_GROUP = 10;
+    const IMG_SIZE = 64;
+    const MARGIN = 8;
+    const container = document.getElementById('container');
+    const counter = document.getElementById('counter');
+    const se = document.getElementById('se');
+    const furiganaList = ['いち','に','さん','よん','ご','ろく','なな','はち','きゅう','じゅう',
+      'じゅういち','じゅうに','じゅうさん','じゅうよん','じゅうご','じゅうろく','じゅうなな','じゅうはち','じゅうきゅう','にじゅう'];
+    const numList = [];
+    let selected = [];
+    let count = 0;
+    let phase = 1; // 1:1-10, 2:11-20
+    let sikakus = [];
+    // 音声合成
+    function speakNum(n) {
+      const ja = ['','いち','に','さん','よん','ご','ろく','なな','はち','きゅう'];
+      let text = '';
+      if(n<=10) text = ja[n];
+      else if(n<20) text = 'じゅう'+ja[n-10];
+      else text = 'にじゅう';
+  window.speechSynthesis.cancel(); // 前の音声を即停止
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ja-JP';
+  window.speechSynthesis.speak(u);
+    }
+    // 重なり判定
+    function isOverlap(x,y,arr) {
+      for(const o of arr) {
+        if(Math.abs(o.x-x)<IMG_SIZE+MARGIN && Math.abs(o.y-y)<IMG_SIZE+MARGIN) return true;
+      }
+      return false;
+    }
+    // 解答欄や白い枠の位置・サイズ取得
+function getRect(id) {
+  const el = document.getElementById(id);
+  if(!el) return null;
+  return el.getBoundingClientRect();
+}
+const avoidRects = [];
+['counter','quiz-result','matome-btn','reset-btn'].forEach(id => {
+  const r = getRect(id);
+  if(r) avoidRects.push(r);
+});
+function isAvoid(x, y) {
+  for(const r of avoidRects) {
+    if(x+IMG_SIZE > r.left && x < r.right && y+IMG_SIZE > r.top && y < r.bottom) return true;
+  }
+  return false;
+}
+// 配置
+    function placeSikakus() {
+      sikakus = [];
+      container.innerHTML = '';
+  const w = window.innerWidth * 0.7, h = window.innerHeight * 0.7;
+  const offsetX = (window.innerWidth - w) / 2;
+  const offsetY = (window.innerHeight - h) / 2;
+      let tries = 0;
+      for(let i=0;i<NUM_TOTAL;i++) {
+        let x,y,ok=false;
+        for(let t=0;t<300;t++) {
+          x = Math.random()*(w-IMG_SIZE-2*MARGIN)+MARGIN + offsetX;
+          y = Math.random()*(h-IMG_SIZE-2*MARGIN)+MARGIN + offsetY;
+          if(!isOverlap(x,y,sikakus) && !isAvoid(x,y)) { ok=true; break; }
+        }
+        if(!ok) {
+          x = offsetX + (i%5)*100;
+          y = offsetY + Math.floor(i/5)*100;
+        }
+        sikakus.push({x,y,idx:i,el:null,selected:false});
+      }
+      for(const s of sikakus) {
+        const div = document.createElement('div');
+        div.className = 'sikaku';
+        div.style.left = s.x+'px';
+        div.style.top = s.y+'px';
+        div.innerHTML = `<img src="sikaku.png" width="64" height="64"><div class="furigana"></div><div class="num"></div>`;
+        div.addEventListener('click',()=>onSikakuClick(s));
+        div.addEventListener('touchstart',e=>{e.preventDefault();onSikakuClick(s);});
+        s.el = div;
+        container.appendChild(div);
+      }
+    }
+    // クリック処理
+    function onSikakuClick(s) {
+      if(s.selected) return;
+      if((phase===1 && count>=10)||(phase===2 && count>=20)) return;
+      s.selected = true;
+      count++;
+      se.currentTime=0; se.play();
+      // アニメ
+      s.el.style.transform = 'scale(1.4)';
+      setTimeout(()=>{s.el.style.transform='scale(1)';},180);
+      // 番号
+      const n = count;
+      const numDiv = s.el.querySelector('.num');
+      const furiDiv = s.el.querySelector('.furigana');
+      numDiv.textContent = n;
+      furiDiv.textContent = furiganaList[n-1]||'';
+      // カウント表示（伏字は右下のみ）
+      updateCounter(n);
+      // 音声
+      speakNum(n);
+      selected.push(s);
+      if(count===10) {
+        // じゅう、いっかいまとめます と発話
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance('じゅう、いっかいまとめます');
+        u.lang = 'ja-JP';
+        window.speechSynthesis.speak(u);
+        setTimeout(()=>{groupSelected(1);},1200);
+      }
+      if(phase===2 && count>=11) showMatomeBtn();
+    }
+    // まとめる（type: 1=左, 2=右）
+    function groupSelected(type) {
+      // type=1:最初の10個, type=2:11以降
+      const w = window.innerWidth, h = window.innerHeight;
+      const gridW = 2, gridH = 5;
+      const marginForGroup = 3; // まとめ時の間隔
+      // 画面サイズに応じて最大サイズを計算
+      let maxWidth = (w * 0.45) / gridW - marginForGroup;
+      let maxHeight = (h * 0.8) / gridH - marginForGroup;
+      let autoSize = Math.floor(Math.min(maxWidth, maxHeight));
+      // 画像サイズを自動調整（最小32px, 最大64px）
+      let groupImgSize = Math.max(32, Math.min(64, autoSize));
+      const totalW = gridW * groupImgSize + (gridW - 1) * marginForGroup;
+      const totalH = gridH * groupImgSize + (gridH - 1) * marginForGroup;
+      let startX, startY;
+      if(type===1) {
+        startX = w/2 - totalW - 24;
+      } else {
+        startX = w/2 + 24;
+      }
+      startY = h/2 - totalH/2;
+      // まとめる対象
+      let arr = (type===1) ? selected.slice(0,10) : selected.slice(10);
+      // 解答欄のrect取得
+      const counterRect = document.getElementById('counter').getBoundingClientRect();
+      for(let i=0;i<arr.length;i++) {
+        const col = i%2, row = Math.floor(i/2);
+        // 必ず3px間隔で等間隔に配置
+        const tx = startX + col * (groupImgSize + marginForGroup);
+        const ty = startY + row * (groupImgSize + marginForGroup);
+        // アニメーションで移動
+        const el = arr[i].el;
+        el.style.transition = 'left 1s cubic-bezier(.77,0,.18,1), top 1s cubic-bezier(.77,0,.18,1), width 0.5s, height 0.5s';
+        setTimeout(()=>{
+          el.style.left = tx+'px';
+          el.style.top = ty+'px';
+          el.style.width = groupImgSize+'px';
+          el.style.height = groupImgSize+'px';
+          const img = el.querySelector('img');
+          if(img) {
+            img.width = groupImgSize;
+            img.height = groupImgSize;
+            img.style.width = groupImgSize+'px';
+            img.style.height = groupImgSize+'px';
+          }
+        }, 50);
+        arr[i].x = tx; arr[i].y = ty;
+        el.style.zIndex = 5;
+      }
+      // 他の画像がぶつかってたら移動
+      for(const s of sikakus) {
+        if(s.selected && arr.includes(s)) continue;
+        for(const sel of arr) {
+          if(Math.abs(s.x-sel.x)<IMG_SIZE+MARGIN && Math.abs(s.y-sel.y)<IMG_SIZE+MARGIN) {
+            s.x += 300;
+            s.y += 300;
+            s.el.style.left = s.x+'px';
+            s.el.style.top = s.y+'px';
+          }
+        }
+      }
+      if(type===1) phase = 2;
+    }
+    // 右下カウンターの表示更新
+    function updateCounter(n) {
+      if(n<=10) {
+        counter.innerHTML = n;
+        document.getElementById('answer-btn').style.display = 'none';
+      } else {
+        // 2桁表示、伏字は一の位
+        const s = n.toString().padStart(2,'0');
+        const fuse = `<span class="fuse" id="fuse-handwrite"></span>`;
+        counter.innerHTML = s[0] + fuse;
+        document.getElementById('answer-btn').style.display = 'block';
+      }
+    }
+
+    // 手書き入力
+    let drawing = false, lastX=0, lastY=0, ctx, canvas;
+    function enableCounterDraw(e) {
+      // 伏字部分のみで有効
+      const fuse = document.getElementById('fuse-handwrite');
+      if(!fuse) return;
+      if(document.getElementById('counter-canvas')) return;
+      // カウンター全体を手書きエリアに
+      const counterRect = counter.getBoundingClientRect();
+      canvas = document.createElement('canvas');
+      canvas.id = 'counter-canvas';
+      canvas.width = counterRect.width*2;
+      canvas.height = counterRect.height*2;
+      canvas.style.position = 'absolute';
+      canvas.style.left = 0;
+      canvas.style.top = 0;
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      canvas.style.pointerEvents = 'auto';
+      canvas.style.zIndex = 3;
+      counter.appendChild(canvas);
+      ctx = canvas.getContext('2d');
+  ctx.lineWidth = 54;
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineCap = 'round';
+      function getXY(e) {
+        if(e.touches) {
+          const rect = canvas.getBoundingClientRect();
+          return [ (e.touches[0].clientX-rect.left)*2, (e.touches[0].clientY-rect.top)*2 ];
+        } else {
+          return [ e.offsetX*2, e.offsetY*2 ];
+        }
+      }
+      function startDraw(e) {
+        drawing = true; counter.classList.add('writing');
+        [lastX,lastY] = getXY(e);
+      }
+      function moveDraw(e) {
+        if(!drawing) return;
+        const [x,y] = getXY(e);
+        ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke();
+        [lastX,lastY] = [x,y];
+      }
+      function endDraw() { drawing=false; counter.classList.remove('writing'); }
+      canvas.addEventListener('mousedown',startDraw);
+      canvas.addEventListener('mousemove',moveDraw);
+      canvas.addEventListener('mouseup',endDraw);
+      canvas.addEventListener('mouseleave',endDraw);
+      canvas.addEventListener('touchstart',startDraw);
+      canvas.addEventListener('touchmove',moveDraw);
+      canvas.addEventListener('touchend',endDraw);
+    }
+    counter.addEventListener('mousedown',enableCounterDraw);
+    counter.addEventListener('touchstart',enableCounterDraw);
+
+    // 解答ボタン
+    document.getElementById('answer-btn').onclick = async function() {
+      const quizResult = document.getElementById('quiz-result');
+      quizResult.style.display = 'none';
+      const n = count;
+      if(n<=10) return;
+      const fuse = document.getElementById('fuse-handwrite');
+      const canvas = document.getElementById('counter-canvas');
+      if(!canvas) { quizResult.textContent = '手書きで数字を書いてください'; quizResult.style.display = 'block'; return; }
+      // 画像データ取得
+      const dataUrl = canvas.toDataURL('image/png');
+      quizResult.textContent = '認識中...'; quizResult.style.display = 'block';
+      // Tesseractで認識
+      const { data: { text } } = await Tesseract.recognize(dataUrl, 'eng', { tessedit_char_whitelist: '0123456789' });
+      const ans = text.replace(/\D/g,'').slice(0,1); // 1桁のみ
+      const answerMark = document.getElementById('answer-mark');
+      const ctxMark = answerMark.getContext('2d');
+      ctxMark.clearRect(0,0,180,180);
+      if(!ans) {
+        quizResult.textContent = '認識できませんでした';
+        quizResult.style.color = '#222';
+        // キャンバス消去
+        if(canvas) canvas.remove();
+        // 赤い？マーク描画
+        ctxMark.font = 'bold 120px sans-serif';
+        ctxMark.fillStyle = 'red';
+        ctxMark.textAlign = 'center';
+        ctxMark.textBaseline = 'middle';
+        ctxMark.fillText('？', 90, 100);
+        return;
+      }
+      // 正解判定
+      const expected = n.toString().padStart(2,'0')[1];
+      if(ans === expected) {
+        quizResult.textContent = '正解！';
+        quizResult.style.color = '#080';
+        document.getElementById('seikai-audio').currentTime = 0;
+        document.getElementById('seikai-audio').play();
+        // 緑の〇を描画
+        ctxMark.beginPath();
+        ctxMark.arc(90,90,70,0,2*Math.PI);
+        ctxMark.lineWidth = 12;
+        ctxMark.strokeStyle = 'green';
+        ctxMark.stroke();
+      } else {
+        quizResult.textContent = `間違い（あなたの答え:${ans}）`;
+        quizResult.style.color = '#d00';
+        document.getElementById('hazure-audio').currentTime = 0;
+        document.getElementById('hazure-audio').play();
+        // 赤い？マーク描画
+        ctxMark.font = 'bold 120px sans-serif';
+        ctxMark.fillStyle = 'red';
+        ctxMark.textAlign = 'center';
+        ctxMark.textBaseline = 'middle';
+        ctxMark.fillText('？', 90, 100);
+        // キャンバス消去
+        if(canvas) canvas.remove();
+      }
+    };
+
+    // リセットボタン
+    document.getElementById('reset-btn').onclick = function() {
+      window.location.reload();
+    };
+
+    // 自動10まとめボタン
+    document.getElementById('auto10-btn').onclick = function() {
+  if(count >= 10) return;
+  let n = count;
+  for(const s of sikakus) {
+    if(!s.selected && n < 10) {
+      s.selected = true;
+      n++;
+      // 番号
+      const numDiv = s.el.querySelector('.num');
+      const furiDiv = s.el.querySelector('.furigana');
+      numDiv.textContent = n;
+      furiDiv.textContent = furiganaList[n-1]||'';
+      s.el.style.transform = 'scale(1.4)';
+      setTimeout(()=>{s.el.style.transform='scale(1)';},180);
+      s.el.style.zIndex = 5;
+      selected.push(s);
+    }
+  }
+  count = 10;
+  updateCounter(10);
+  // じゅう、いっかいまとめます と発話
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance('じゅう、いっかいまとめます');
+  u.lang = 'ja-JP';
+  window.speechSynthesis.speak(u);
+  setTimeout(()=>{groupSelected(1);},1200);
+};
+    // まとめるボタン
+    function showMatomeBtn() {
+      let btn = document.getElementById('matome-btn');
+      if(!btn) {
+        btn = document.createElement('button');
+        btn.id = 'matome-btn';
+        btn.textContent = 'まとめる';
+        btn.onclick = ()=>{
+          // 選択していないsikakuを消す
+          for(const s of sikakus) {
+            if(!s.selected && s.el) {
+              s.el.remove();
+            }
+          }
+          groupSelected(2);
+          btn.style.display='none';
+        };
+        document.body.appendChild(btn);
+      }
+      btn.style.display = 'block';
+    }
+
+  window.addEventListener('resize',placeSikakus);
+  placeSikakus();
+  </script>
+</body>
+</html>
