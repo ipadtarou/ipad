@@ -176,6 +176,9 @@ body {
   <div id="cherryArea">
     <div class="cherry" id="cherryLeft"></div>
     <div class="cherry" id="cherryRight"></div>
+    <button id="makeTenBtn" style="display:none; position:absolute; left:50%; transform:translateX(-50%); top:200px; padding:10px 40px; font-size:32px; background:#ff69b4; color:white; border:none; border-radius:20px; cursor:pointer; z-index:20;">10をつくる</button>
+    <svg id="tenOval" style="display:none; position:absolute; pointer-events:none; z-index:10;"></svg>
+    <div id="tenBigLabel" style="display:none; position:absolute; left:60px; top:60px; font-size:100px; color:#ff69b4; font-weight:bold; z-index:11;">10</div>
   </div>
   <div id="judgeMark"></div>
   <div id="panelArea"></div>
@@ -208,11 +211,14 @@ const maru = document.getElementById('maru');
 const batu = document.getElementById('batu');
 const poko = document.getElementById('poko');
 const judgeMark = document.getElementById('judgeMark');
+const makeTenBtn = document.getElementById('makeTenBtn');
+const tenOval = document.getElementById('tenOval');
+const tenLabel = document.getElementById('tenLabel');
 
 let totalQuestions = 0;
 let currentQ = 0;
 let a, b;
-let step = 0; // 0=cherry, 1=answer
+let step = 0; // 0=makeTen, 1=rightCherry, 2=answer
 let correctCherry = [];
 let correctAnswer = 0;
 let startTime;
@@ -239,11 +245,14 @@ function startQuiz(){
 
 function nextQuestion(){
   if(currentQ >= totalQuestions){
-    const time = ((new Date() - startTime)/1000).toFixed(1);
-    problemEl.innerHTML = `<span style="font-size:60px;">完了！${time}秒かかりました</span>`;
+    problemEl.innerHTML = `<span style="font-size:60px;">完了！${((new Date() - startTime)/1000).toFixed(1)}秒かかりました</span>`;
     panelArea.innerHTML = "";
     cherryLeft.textContent = "";
     cherryRight.textContent = "";
+    makeTenBtn.style.display = "none";
+    tenOval.style.display = "none";
+    tenLabel.style.display = "none";
+    document.getElementById('tenBigLabel').style.display = "none";
     return;
   }
 
@@ -252,25 +261,29 @@ function nextQuestion(){
     b = Math.floor(Math.random() * 9) + 1;
   } while (a + b < 11);
 
-  problemEl.innerHTML = `${a} + <span id="b_number">${b}</span> = <span id="answerBox">　</span>`;
+  problemEl.innerHTML = `<span id="a_number">${a}</span> + <span id="b_number">${b}</span> = <span id="answerBox">　</span>`;
   answerBox = document.getElementById('answerBox');
-  
-  setTimeout(drawLines, 50); // Draw lines after elements are rendered
+  setTimeout(drawLines, 50);
 
-  correctCherry = [10-a, b-(10-a)];
-  if(correctCherry[0] > correctCherry[1]) correctCherry.reverse();
-  correctAnswer = a+b;
+  // 左のさくらんぼは「？」のまま
+  correctCherry = [null]; // 右のみ答える
+  correctAnswer = a + b;
 
-  cherryLeft.textContent = "";
+  cherryLeft.textContent = "？";
   cherryRight.textContent = "";
   judgeMark.style.opacity = 0;
   judgeMark.style.transform = "scale(0)";
   step = 0;
-  showPanels(0);
+  makeTenBtn.style.display = "block";
+  tenOval.style.display = "none";
+  tenLabel.style.display = "none";
+  document.getElementById('tenBigLabel').style.display = "none";
+  showPanels(-1);
 }
 
 function showPanels(mode){
   panelArea.innerHTML = "";
+  if(mode === -1) return;
   const range = mode === 0 ? 10 : 20;
   for(let i=0;i<range;i++){
     const num = i;
@@ -281,6 +294,38 @@ function showPanels(mode){
     panelArea.appendChild(div);
   }
 }
+
+makeTenBtn.onclick = function(){
+  tenOval.style.display = "block";
+  // 10のラベルをボタンの左上に固定配置
+  const btnRect = makeTenBtn.getBoundingClientRect();
+  const cherryAreaRect = document.getElementById('cherryArea').getBoundingClientRect();
+  document.getElementById('tenBigLabel').style.display = "block";
+  document.getElementById('tenBigLabel').style.left = (btnRect.left - cherryAreaRect.left - 120) + "px";
+  document.getElementById('tenBigLabel').style.top = (btnRect.top - cherryAreaRect.top - 120) + "px";
+  // 式の左の数字と左さくらんぼを楕円で囲む
+  // それぞれの中心座標を取得
+  const aRect = document.getElementById('a_number').getBoundingClientRect();
+  const leftRect = cherryLeft.getBoundingClientRect();
+  const quizRect = quizScreen.getBoundingClientRect();
+  // aの中心
+  const ax = aRect.left + aRect.width/2 - quizRect.left;
+  const ay = aRect.top + aRect.height/2 - quizRect.top;
+  // さくらんぼ左の中心
+  const lx = leftRect.left + leftRect.width/2 - quizRect.left;
+  const ly = leftRect.top + leftRect.height/2 - quizRect.top;
+  // 楕円の中心は2点の中間
+  const cx = (ax + lx) / 2;
+  const cy = (ay + ly) / 2;
+  // 楕円の半径は2点間距離に余裕を持たせる
+  const dx = Math.abs(ax - lx);
+  const dy = Math.abs(ay - ly);
+  const rx = dx/2 + 80;
+  const ry = dy/2 + 60;
+  tenOval.innerHTML = `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#ff69b4" stroke-width="8" />`;
+  step = 1;
+  showPanels(0);
+};
 
 function drawLines() {
     const svg = document.getElementById('lineCanvas');
@@ -337,55 +382,40 @@ function clickNumber(div, num){
 
   setTimeout(() => {
     let target;
-    if(step === 0){
-      if(!cherryLeft.textContent) target = cherryLeft;
-      else target = cherryRight;
-    } else target = answerBox;
+    if(step === 1){
+      target = cherryRight;
+    } else if(step === 2){
+      target = answerBox;
+    } else {
+      clone.remove();
+      return;
+    }
 
     const tRect = target.getBoundingClientRect();
     clone.style.left = tRect.left + "px";
     clone.style.top = tRect.top + "px";
     clone.style.transform = "scale(0.8)";
-    
+
     setTimeout(() => {
       clone.remove();
-      if(step === 0){
-        if(!cherryLeft.textContent) cherryLeft.textContent = num;
-        else cherryRight.textContent = num;
-
-        if(cherryLeft.textContent && cherryRight.textContent){
-          const arr = [parseInt(cherryLeft.textContent), parseInt(cherryRight.textContent)];
-          if(JSON.stringify(arr.sort((a,b)=>a-b)) === JSON.stringify(correctCherry.sort((a,b)=>a-b))){
-            maru.play();
-            
-            // Check if swapping is needed
-            if (parseInt(cherryLeft.textContent) !== (10 - a)) {
-              cherryLeft.classList.add('swap-animation-left');
-              cherryRight.classList.add('swap-animation-right');
-              
-              setTimeout(() => {
-                cherryLeft.classList.remove('swap-animation-left');
-                cherryRight.classList.remove('swap-animation-right');
-                const temp = cherryLeft.textContent;
-                cherryLeft.textContent = cherryRight.textContent;
-                cherryRight.textContent = temp;
-                
-                step = 1;
-                showPanels(1);
-              }, 800); // Match animation duration
-            } else {
-              step = 1;
-              showPanels(1);
-            }
-          } else {
-            batu.play();
-            quizScreen.classList.add("shake");
-            setTimeout(()=>quizScreen.classList.remove("shake"),400);
-            cherryLeft.textContent = "";
-            cherryRight.textContent = "";
-          }
+      if(step === 1){
+        cherryRight.textContent = num;
+        correctCherry[0] = num;
+        // 判定: b - (10 - a) = 右
+        const leftValue = 10 - a;
+        const rightOk = (b - leftValue === correctCherry[0]);
+        if(rightOk){
+          maru.play();
+          step = 2;
+          showPanels(1);
+        }else{
+          batu.play();
+          quizScreen.classList.add("shake");
+          setTimeout(()=>quizScreen.classList.remove("shake"),400);
+          cherryRight.textContent = "";
+          correctCherry = [null];
         }
-      } else {
+      } else if(step === 2){
         if(num === correctAnswer){
           maru.play();
           answerBox.textContent = num;

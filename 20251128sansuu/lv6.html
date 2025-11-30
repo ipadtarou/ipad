@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>さくらんぼ算 完全版</title>
+<style>
+body {
+  margin:0; padding:0; font-family:"Arial Rounded MT", sans-serif; background:#fffaf0; overflow:hidden; user-select:none;
+}
+.screen { display:none; width:100%; height:100vh; position:relative; }
+.active { display:flex; justify-content:center; align-items:center; flex-direction:column; }
+#selectScreen { background:#fff0f5; }
+.select-grid { display:grid; grid-template-columns:repeat(5,100px); gap:20px; }
+.select-btn { background:#ffe4e1; border-radius:50%; width:100px;height:100px; font-size:36px; border:2px solid #ff9999; cursor:pointer; transition:0.2s; }
+.select-btn:hover { background:#ffcccc; transform:scale(1.05); }
+
+#quizScreen { background:#fafad2; flex-direction:column; justify-content:flex-start; align-items:center; position:relative; }
+#problem { font-size:110px; margin-top:50px; text-align:center; position:relative; }
+#answerBox { display:inline-block; width:120px;height:100px; border:5px solid #333; font-size:70px; text-align:center; line-height:100px; background:#fff; }
+#cherryArea { position:relative; margin-top:40px; width:500px; height:220px; }
+.cherry { position:absolute; width:90px;height:90px; border-radius:50%; background:#ffb6c1; border:3px solid #ff69b4; font-size:50px; text-align:center; line-height:90px; }
+#cherryLeft { left:120px; top:100px; }
+#cherryRight { right:120px; top:100px; }
+.swap-animation-right { animation: swap-right 0.8s ease-in-out forwards; }
+@keyframes swap-right { 0%{transform:translate(0,0);}50%{transform:translate(-130px,0) scale(1.2);}100%{transform:translate(-260px,0);} }
+
+#panelArea { position:absolute; bottom:40px; display:grid; grid-template-columns:repeat(10,1fr); gap:8px; width:90%; justify-items:center; }
+.number { background:#f5deb3; border:2px solid #cd853f; width:80px;height:80px; border-radius:10px; font-size:36px; text-align:center; line-height:80px; cursor:pointer; position:relative; transition:all 0.6s ease; }
+.number:hover { background:#ffe4b5; }
+.slide { position:absolute !important; transition:all 0.6s cubic-bezier(0.25,1.25,0.5,1); z-index:10; }
+
+#judgeMark { font-size:180px; position:absolute; top:30%; color:red; opacity:0; transform:scale(0); transition:all 0.5s ease; }
+.shake { animation:shake 0.4s ease-in-out 2; }
+@keyframes shake {0%,100%{transform:translate(0,0);}25%{transform:translate(10px,0);}50%{transform:translate(-10px,0);}75%{transform:translate(8px,0);}}
+
+#makeTenBtn { display:none; position:absolute; left:50%; transform:translateX(-50%); top:200px; padding:10px 40px; font-size:32px; background:#ff69b4; color:white; border:none; border-radius:20px; cursor:pointer; z-index:20; }
+#tenOval { display:none; position:absolute; pointer-events:none; z-index:10; }
+#tenBigLabel { display:none; position:absolute; font-size:100px; color:#ff69b4; font-weight:bold; z-index:11; }
+</style>
+</head>
+<body>
+
+<div id="selectScreen" class="screen active">
+  <h1>問題数を選んでください</h1>
+  <div class="select-grid" id="selectGrid"></div>
+</div>
+
+<div id="quizScreen" class="screen">
+  <div id="problem"></div>
+  <div id="cherryArea">
+    <div class="cherry" id="cherryLeft"></div>
+    <div class="cherry" id="cherryRight"></div>
+    <button id="makeTenBtn">10をつくる</button>
+    <svg id="tenOval"></svg>
+    <div id="tenBigLabel">10</div>
+  </div>
+  <div id="judgeMark"></div>
+  <div id="panelArea"></div>
+</div>
+
+<script>
+const selectGrid = document.getElementById('selectGrid');
+const selectScreen = document.getElementById('selectScreen');
+const quizScreen = document.getElementById('quizScreen');
+const problemEl = document.getElementById('problem');
+const cherryLeft = document.getElementById('cherryLeft');
+const cherryRight = document.getElementById('cherryRight');
+const panelArea = document.getElementById('panelArea');
+const judgeMark = document.getElementById('judgeMark');
+const makeTenBtn = document.getElementById('makeTenBtn');
+const tenOval = document.getElementById('tenOval');
+const tenBigLabel = document.getElementById('tenBigLabel');
+
+let totalQuestions=0, currentQ=0, a,b,step=0, correctAnswer=0, answerBox;
+
+for(let i=1;i<=15;i++){
+  const btn=document.createElement('button');
+  btn.className='select-btn';
+  btn.textContent=i;
+  btn.onclick=()=>{ totalQuestions=i; startQuiz(); };
+  selectGrid.appendChild(btn);
+}
+
+function startQuiz(){
+  selectScreen.classList.remove('active');
+  quizScreen.classList.add('active');
+  currentQ=0;
+  nextQuestion();
+}
+
+function nextQuestion(){
+  if(currentQ>=totalQuestions){
+    problemEl.innerHTML=`<span style="font-size:60px;">完了！</span>`;
+    panelArea.innerHTML=""; cherryLeft.textContent=""; cherryRight.textContent=""; makeTenBtn.style.display="none"; tenOval.style.display="none"; tenBigLabel.style.display="none";
+    return;
+  }
+
+  do{ a=Math.floor(Math.random()*9)+1; b=Math.floor(Math.random()*9)+1; }while(a+b<11);
+  problemEl.innerHTML=`<span id="a_number">${a}</span> + <span id="b_number">${b}</span> = <span id="answerBox">　</span>`;
+  answerBox=document.getElementById('answerBox');
+  cherryLeft.textContent="？"; cherryRight.textContent=""; judgeMark.style.opacity=0; judgeMark.style.transform="scale(0)";
+  step=0; makeTenBtn.style.display="block"; tenOval.style.display="none"; tenBigLabel.style.display="none";
+  correctAnswer=a+b;
+  showPanels(-1);
+}
+
+makeTenBtn.onclick=function(){
+  const cherryArea=document.getElementById('cherryArea');
+  tenOval.style.display="block";
+
+  const aRect=document.getElementById('a_number').getBoundingClientRect();
+  const leftRect=cherryLeft.getBoundingClientRect();
+  const cherryAreaRect=cherryArea.getBoundingClientRect();
+
+  const ax=aRect.left + aRect.width/2 - cherryAreaRect.left;
+  const ay=aRect.top + aRect.height/2 - cherryAreaRect.top;
+  const lx=leftRect.left + leftRect.width/2 - cherryAreaRect.left;
+  const ly=leftRect.top + leftRect.height/2 - cherryAreaRect.top;
+
+  const cx=(ax+lx)/2, cy=(ay+ly)/2;
+  const dx=Math.abs(ax-lx), dy=Math.abs(ay-ly);
+  const rx=dx/2+40, ry=dy/2+40;
+  tenOval.innerHTML=`<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#ff69b4" stroke-width="6"/>`;
+
+  // ピンクの10ラベルをボタンの左上に固定
+  tenBigLabel.style.display="block";
+  const btnRect = makeTenBtn.getBoundingClientRect();
+  tenBigLabel.style.left = (btnRect.left - cherryAreaRect.left - 120) + "px";
+  tenBigLabel.style.top = (btnRect.top - cherryAreaRect.top - 120) + "px";
+
+  cherryLeft.textContent=a;
+  cherryRight.textContent="";
+  step=1;
+  showPanels(0);
+};
+
+function clickNumber(div,num){
+  const rect=div.getBoundingClientRect();
+  const clone=div.cloneNode(true);
+  clone.classList.add('slide');
+  document.body.appendChild(clone);
+  clone.style.left=rect.left+"px"; clone.style.top=rect.top+"px";
+
+  setTimeout(()=>{
+    let target;
+    if(step===1){ target=cherryRight; } else if(step===2){ target=answerBox; } else { clone.remove(); return; }
+
+    const tRect=target.getBoundingClientRect();
+    clone.style.left=tRect.left+"px"; clone.style.top=tRect.top+"px"; clone.style.transform="scale(0.8)";
+
+    setTimeout(()=>{
+      clone.remove();
+      if(step===1){
+        cherryRight.textContent=num;
+        // 判定: b - (10 - a) = 右
+        const leftValue = 10 - a;
+        const rightOk = (b - leftValue === num);
+        if(rightOk){
+          step=2;
+          showPanels(1);
+        }else{
+          quizScreen.classList.add("shake");
+          setTimeout(()=>quizScreen.classList.remove("shake"),400);
+          cherryRight.textContent = "";
+        }
+      } else if(step===2){
+        if(num===correctAnswer){
+          answerBox.textContent=num;
+          judgeMark.textContent="〇"; judgeMark.style.color="red"; judgeMark.style.opacity=1; judgeMark.style.transform="scale(1)";
+          setTimeout(()=>{ judgeMark.style.opacity=0; currentQ++; nextQuestion(); },1000);
+        } else {
+          judgeMark.textContent="×"; judgeMark.style.color="blue"; judgeMark.style.opacity=1; judgeMark.style.transform="scale(1)";
+          quizScreen.classList.add("shake");
+          setTimeout(()=>{
+            judgeMark.style.opacity=0; judgeMark.style.transform="scale(0)";
+            quizScreen.classList.remove("shake"); answerBox.textContent="";
+          },1000);
+        }
+      }
+    },600);
+  },50);
+}
+</script>
+</body>
+</html>
