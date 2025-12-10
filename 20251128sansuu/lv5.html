@@ -161,6 +161,13 @@ body {
   50% { transform: translate(-10px, 0); }
   75% { transform: translate(8px, 0); }
 }
+
+/* 10をつくるボタンの押下アニメーション */
+@keyframes pushBtn {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
 </style>
 </head>
 <body>
@@ -172,13 +179,13 @@ body {
 
 <div id="quizScreen" class="screen">
   <svg id="lineCanvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 5;"></svg>
+  <svg id="tenOval" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></svg>
   <div id="problem"></div>
   <div id="cherryArea">
     <div class="cherry" id="cherryLeft"></div>
     <div class="cherry" id="cherryRight"></div>
     <button id="makeTenBtn" style="display:none; position:absolute; left:50%; transform:translateX(-50%); top:200px; padding:10px 40px; font-size:32px; background:#ff69b4; color:white; border:none; border-radius:20px; cursor:pointer; z-index:20;">10をつくる</button>
-    <svg id="tenOval" style="display:none; position:absolute; pointer-events:none; z-index:10;"></svg>
-    <div id="tenBigLabel" style="display:none; position:absolute; left:60px; top:60px; font-size:100px; color:#ff69b4; font-weight:bold; z-index:11;">10</div>
+    <div id="tenBigLabel" style="display:none; position:absolute; left:80px; top:5px; font-size:100px; color:#ff69b4; font-weight:bold; z-index:11;">10</div>
   </div>
   <div id="judgeMark"></div>
   <div id="panelArea"></div>
@@ -187,6 +194,7 @@ body {
 <audio id="maru" src="maru.mp3"></audio>
 <audio id="batu" src="batu.mp3"></audio>
 <audio id="poko" src="poko.mp3"></audio>
+<audio id="makeTenSound" src="poko.mp3"></audio>
 
 <script>
 // Disable unwanted interactions
@@ -296,33 +304,42 @@ function showPanels(mode){
 }
 
 makeTenBtn.onclick = function(){
+  // ボタン押下アニメーション
+  makeTenBtn.style.animation = "pushBtn 0.3s";
+  setTimeout(()=>{ makeTenBtn.style.animation = ""; }, 300);
+  // 効果音再生
+  const makeTenSound = document.getElementById('makeTenSound');
+  makeTenSound.currentTime = 0;
+  makeTenSound.play();
+
   tenOval.style.display = "block";
-  // 10のラベルをボタンの左上に固定配置
-  const btnRect = makeTenBtn.getBoundingClientRect();
+  // quizScreen全体のサイズ取得
+  const quizScreenRect = quizScreen.getBoundingClientRect();
+  const svgWidth = quizScreenRect.width;
+  const svgHeight = quizScreenRect.height;
+  tenOval.setAttribute('width', svgWidth);
+  tenOval.setAttribute('height', svgHeight);
+  tenOval.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+  tenOval.style.width = svgWidth + "px";
+  tenOval.style.height = svgHeight + "px";
+
+  // 左のさくらんぼのナナメ左上にピンクの10を表示
   const cherryAreaRect = document.getElementById('cherryArea').getBoundingClientRect();
-  document.getElementById('tenBigLabel').style.display = "block";
-  document.getElementById('tenBigLabel').style.left = (btnRect.left - cherryAreaRect.left - 120) + "px";
-  document.getElementById('tenBigLabel').style.top = (btnRect.top - cherryAreaRect.top - 120) + "px";
-  // 式の左の数字と左さくらんぼを楕円で囲む
-  // それぞれの中心座標を取得
-  const aRect = document.getElementById('a_number').getBoundingClientRect();
   const leftRect = cherryLeft.getBoundingClientRect();
-  const quizRect = quizScreen.getBoundingClientRect();
+  const tenBigLabel = document.getElementById('tenBigLabel');
+  tenBigLabel.style.display = "block";
+  tenBigLabel.style.left = (leftRect.left - cherryAreaRect.left - 110) + "px";
+  tenBigLabel.style.top = (leftRect.top - cherryAreaRect.top - 110) + "px";
+
+  // 式の左の数字と左さくらんぼを線で結ぶ（quizScreen基準）
+  const aRect = document.getElementById('a_number').getBoundingClientRect();
   // aの中心
-  const ax = aRect.left + aRect.width/2 - quizRect.left;
-  const ay = aRect.top + aRect.height/2 - quizRect.top;
+  const ax = aRect.left + aRect.width/2 - quizScreenRect.left;
+  const ay = aRect.top + aRect.height/2 - quizScreenRect.top;
   // さくらんぼ左の中心
-  const lx = leftRect.left + leftRect.width/2 - quizRect.left;
-  const ly = leftRect.top + leftRect.height/2 - quizRect.top;
-  // 楕円の中心は2点の中間
-  const cx = (ax + lx) / 2;
-  const cy = (ay + ly) / 2;
-  // 楕円の半径は2点間距離に余裕を持たせる
-  const dx = Math.abs(ax - lx);
-  const dy = Math.abs(ay - ly);
-  const rx = dx/2 + 80;
-  const ry = dy/2 + 60;
-  tenOval.innerHTML = `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#ff69b4" stroke-width="8" />`;
+  const lx = leftRect.left + leftRect.width/2 - quizScreenRect.left;
+  const ly = leftRect.top + leftRect.height/2 - quizScreenRect.top;
+  tenOval.innerHTML = `<line x1="${ax}" y1="${ay}" x2="${lx}" y2="${ly}" stroke="rgba(255,105,180,0.5)" stroke-width="70.4" />`;
   step = 1;
   showPanels(0);
 };
@@ -423,6 +440,8 @@ function clickNumber(div, num){
           judgeMark.style.color = "red";
           judgeMark.style.opacity = 1;
           judgeMark.style.transform = "scale(1)";
+          // ピンクの10を消す
+          document.getElementById('tenBigLabel').style.display = "none";
           setTimeout(()=>{ judgeMark.style.opacity=0; currentQ++; nextQuestion(); },1000);
         } else {
           batu.play();

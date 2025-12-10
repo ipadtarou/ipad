@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 20px; /* 文字全体を少し大きく */
+    }
+
+    .container {
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      max-width: 800px;
+    }
+
+    .party {
+      flex: 1;
+      margin: 10px;
+      text-align: center;
+      transition: transform 0.3s;
+    }
+
+    .party img {
+      width: 100%;
+      max-width: 200px;
+      cursor: pointer;
+    }
+
+    .bar-container {
+      height: 300px;
+      background: #eee;
+      margin: 10px 0;
+      position: relative;
+    }
+
+    .bar {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      background: #4CAF50;
+      transition: height 0.3s;
+    }
+
+    .votes {
+      font-size: 180px;
+      font-weight: bold;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      color: #000;
+      text-shadow: 2px 2px 8px #fff, 0 0 8px #fff;
+      line-height: 1;
+    }
+    .votes-undou {
+      left: -120px;
+    }
+    .votes-karaoke {
+      right: -120px;
+    }
+
+    button {
+      margin-top: 20px;
+      font-size: 20px;
+      padding: 12px 24px;
+    }
+
+    .party-name {
+      font-size: 24px;
+      margin-top: 10px;
+    }
+
+    /* 勝った瞬間だけ揺らす */
+    .sway-once {
+      animation: sway 0.6s ease-in-out 1;
+    }
+
+    @keyframes sway {
+      0% { transform: rotate(0deg); }
+      25% { transform: rotate(-2deg); }
+      50% { transform: rotate(2deg); }
+      75% { transform: rotate(-1deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* 光る効果（常に表示） */
+    .glow {
+      box-shadow: 0 0 20px 10px rgba(255, 215, 0, 0.7);
+    }
+  </style>
+</head>
+<body>
+
+  <h1></h1>
+
+  <div class="container">
+    <div class="party" id="undou">
+      <img src="ao.jpg" alt="運動党" onclick="vote('undou', 'ao1')">
+      <div class="party-name"></div>
+      <div class="bar-container" style="position:relative;">
+        <div class="bar" id="bar-undou" style="height: 0%; background: #3498db;"></div>
+        <div class="votes votes-undou" id="votes-undou">0</div>
+      </div>
+    </div>
+
+    <div class="party" id="karaoke">
+      <img src="aka.jpg" alt="カラオケ・ダンス党" onclick="vote('karaoke', 'aka1')">
+      <div class="party-name"></div>
+      <div class="bar-container" style="position:relative;">
+        <div class="bar" id="bar-karaoke" style="height: 0%; background: #e74c3c;"></div>
+        <div class="votes votes-karaoke" id="votes-karaoke">0</div>
+      </div>
+    </div>
+  </div>
+
+  <button onclick="undo()">ひとつ戻る</button>
+
+  <audio id="sound" src="kouka.wav" preload="auto"></audio>
+  <audio id="ao1" src="AO1.mp3" preload="auto"></audio>
+  <audio id="aopass" src="AOPASS.mp3" preload="auto"></audio>
+  <audio id="aka1" src="AKA1.mp3" preload="auto"></audio>
+  <audio id="akapass" src="AKAPASS2.mp3" preload="auto"></audio>
+
+  <script>
+    const votes = { undou: 0, karaoke: 0 };
+    const history = [];
+    let previousWinner = null;
+    let lastActionTime = 0;
+    const WAIT_TIME = 5000; // 5秒
+
+    function playAudio(id) {
+      const audio = document.getElementById(id);
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play();
+      }
+    }
+
+    function vote(party, soundId) {
+      const now = Date.now();
+      if (now - lastActionTime < WAIT_TIME) return;
+      votes[party]++;
+      history.push(party);
+      playAudio(soundId);
+      updateDisplay();
+      lastActionTime = now;
+    }
+
+    function undo() {
+      const now = Date.now();
+      if (now - lastActionTime < WAIT_TIME) return;
+      const lastVote = history.pop();
+      if (lastVote && votes[lastVote] > 0) {
+        votes[lastVote]--;
+        updateDisplay();
+        playAudio(lastVote === 'undou' ? 'aopass' : 'akapass');
+        lastActionTime = now;
+      }
+    }
+
+    function updateDisplay() {
+      const total = votes.undou + votes.karaoke || 1;
+
+      const percentUndou = (votes.undou / total) * 100;
+      const percentKaraoke = (votes.karaoke / total) * 100;
+
+      document.getElementById('votes-undou').textContent = `${votes.undou}`;
+      document.getElementById('votes-karaoke').textContent = `${votes.karaoke}`;
+
+      document.getElementById('bar-undou').style.height = percentUndou + '%';
+      document.getElementById('bar-karaoke').style.height = percentKaraoke + '%';
+
+      const undouEl = document.getElementById('undou');
+      const karaokeEl = document.getElementById('karaoke');
+
+      // リセット
+      undouEl.classList.remove('glow', 'sway-once');
+      karaokeEl.classList.remove('glow', 'sway-once');
+
+      let currentWinner = null;
+      if (votes.undou > votes.karaoke) currentWinner = 'undou';
+      else if (votes.karaoke > votes.undou) currentWinner = 'karaoke';
+
+      if (currentWinner) {
+        const winnerEl = document.getElementById(currentWinner);
+        winnerEl.classList.add('glow');
+
+        // 直前と違う勝者だったら揺らす
+        if (currentWinner !== previousWinner) {
+          winnerEl.classList.add('sway-once');
+          // 一度だけの揺れが終わったらクラスを外す（次回のため）
+          setTimeout(() => {
+            winnerEl.classList.remove('sway-once');
+          }, 700);
+        }
+      }
+
+      previousWinner = currentWinner;
+    }
+
+    // キー操作対応
+    document.addEventListener('mousedown', function(e) {
+      // 左: 0, 中: 1, 右: 2
+      if (e.button === 0) {
+        vote('undou', 'ao1');
+      } else if (e.button === 1) {
+        vote('karaoke', 'aka1');
+      } else if (e.button === 2) {
+        vote('karaoke', 'akapass');
+      }
+    });
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    document.addEventListener('keydown', function(e) {
+      // ALT+→
+      if (e.altKey && (e.key === 'ArrowRight' || e.code === 'ArrowRight')) {
+        vote('undou', 'aopass');
+      }
+    });
+  </script>
+
+</body>
+</html>
