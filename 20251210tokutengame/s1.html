@@ -219,8 +219,8 @@
     });
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
     document.addEventListener('keydown', function(e) {
-      // ALT+→
-      if (e.altKey && (e.key === 'ArrowRight' || e.code === 'ArrowRight')) {
+      // [a]キーで加点
+      if (e.key === 'a' || e.key === 'A') {
         vote('undou', 'aopass');
       }
     });
