@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>きんちゃん作業の結果</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh; overflow: hidden; }
+
+/* === 画面1 === */
+#screen1 {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100vh; gap: 20px;
+}
+#screen1 h1 { font-size: 1.8em; margin-bottom: 10px; }
+.input-group { display: flex; flex-direction: column; gap: 12px; width: 320px; }
+.input-row { display: flex; flex-direction: column; gap: 4px; }
+.input-row label { font-size: 0.9em; color: #aaa; }
+.input-row-set { display: flex; gap: 6px; align-items: center; }
+.input-row-set input {
+  width: 80px; padding: 8px; border-radius: 6px; border: 1px solid #555;
+  background: #2a2a4a; color: #fff; text-align: center; font-size: 1em;
+}
+.input-row-set span { font-size: 0.75em; color: #888; white-space: nowrap; }
+#btnStart {
+  margin-top: 10px; padding: 12px 40px; font-size: 1.2em;
+  background: #e94560; border: none; border-radius: 8px; color: #fff; cursor: pointer;
+}
+#btnStart:hover { background: #c73050; }
+
+/* === 画面2 === */
+#screen2 { display: none; height: 100vh; position: relative; }
+.columns { display: flex; height: 100vh; }
+.col {
+  flex: 1; border-right: 2px solid #333; display: flex; flex-direction: column;
+  align-items: center; padding: 8px; position: relative; overflow: hidden;
+}
+.col:last-child { border-right: none; }
+.col h2 { font-size: 1em; margin-bottom: 4px; color: #ffd700; }
+
+/* 積み上げエリア：前回と今回を横並び */
+.stack-area {
+  flex: 1; width: 100%; display: flex; gap: 0;
+  overflow: hidden; min-height: 0; position: relative;
+}
+
+/* 電球装飾：curColの周囲に配置 */
+.bulb-wrap {
+  position: absolute; inset: 0; pointer-events: none; z-index: 10;
+}
+.bulb {
+  display: none; position: absolute; width: 10px; height: 10px;
+  border-radius: 50%; transform: translate(-50%,-50%);
+}
+.bulb-wrap.seikou .bulb {
+  display: block;
+  animation: bulbBlink 0.3s ease-in-out infinite alternate;
+}
+.bulb-wrap.seikou .bulb:nth-child(odd) { animation-delay: 0.15s; }
+@keyframes bulbBlink {
+  from { background: rgba(255,230,50,0.95); box-shadow: 0 0 12px 5px rgba(255,200,0,0.9); }
+  to   { background: rgba(255,200,50,0.4);  box-shadow: 0 0 4px 1px rgba(255,180,0,0.3); }
+}
+
+/* 前回列・今回列 共通 */
+.stack-col {
+  flex: 1; display: flex; flex-direction: column-reverse;
+  align-items: center; overflow: hidden; gap: 0; padding-bottom: 2px;
+  position: relative;
+}
+.stack-col-label {
+  font-size: 0.65em; color: #888; text-align: center; padding: 2px 0; flex-shrink: 0;
+}
+
+/* 今回列のスロット（プレースホルダー枠） */
+.slot {
+  width: 100%; max-width: 70px; flex-shrink: 0;
+  aspect-ratio: 1 / 1;
+  border: 1px dashed rgba(255,240,100,0.2);
+  background: rgba(255,240,100,0.04);
+  border-radius: 4px; position: relative;
+}
+/* 最後のスロット（一番上）の下に赤線 */
+.slot.goal-line::after {
+  content: ''; position: absolute; bottom: -2px; left: 0; right: 0;
+  height: 3px; background: #e94560;
+  box-shadow: 0 0 6px 2px rgba(233,69,96,0.7);
+}
+
+/* 積み上げ画像 */
+.stack-img {
+  width: 100%; max-width: 70px; flex-shrink: 0;
+  display: block; position: relative; z-index: 2;
+}
+.stack-img.prev { opacity: 0.6; }
+
+/* 今回分：電球風の光る枠＋カラー（通常：黄） */
+.stack-img.current {
+  border-radius: 6px;
+  filter: hue-rotate(30deg) saturate(1.8) brightness(1.15);
+  box-shadow: 0 0 8px 3px rgba(255,220,50,0.85), 0 0 18px 6px rgba(255,160,0,0.5);
+  outline: 2px solid rgba(255,230,80,0.9);
+  animation: popIn 0.3s cubic-bezier(.2,1.4,.5,1);
+}
+/* 合格後：赤く光る */
+.stack-img.current.seikou {
+  filter: hue-rotate(330deg) saturate(2) brightness(1.2);
+  box-shadow: 0 0 10px 4px rgba(255,50,50,0.9), 0 0 22px 8px rgba(200,0,0,0.5);
+  outline: 2px solid rgba(255,80,80,0.95);
+}
+@keyframes popIn {
+  from { transform: scaleY(0.4); opacity: 0; }
+  to   { transform: scaleY(1);   opacity: 1; }
+}
+
+/* 成功後の大きな数字バナー */
+.result-banner {
+  display: none; position: absolute; top: 0; left: 0; right: 0;
+  z-index: 20; align-items: center; justify-content: center;
+  background: rgba(10,10,30,0.82); padding: 8px 0;
+}
+.result-banner.show { display: flex; }
+.result-banner .rnum {
+  font-size: clamp(4rem, 12vw, 10rem); font-weight: bold; color: #ffd700;
+  animation: pulsate 1.8s ease-in-out infinite;
+}
+@keyframes pulsate {
+  0%,100% { transform: scale(1);    opacity: 1; }
+  50%      { transform: scale(1.25); opacity: 0.75; }
+}
+.click-wrap {
+  width: 100%; display: flex; justify-content: center; padding: 4px 0;
+  cursor: pointer; user-select: none;
+}
+.click-img {
+  width: 80px; border-radius: 8px; border: 3px solid transparent;
+  transition: border-color 0.15s;
+}
+.click-img.selected { border-color: red; box-shadow: 0 0 10px red; }
+
+/* ボタン */
+.btn-count {
+  padding: 8px 16px; background: #e94560; border: none; border-radius: 6px;
+  color: #fff; cursor: pointer; font-size: 0.95em; margin-top: 4px;
+}
+.btn-expand {
+  padding: 5px 10px; background: #333; border: none; border-radius: 6px;
+  color: #aaa; cursor: pointer; font-size: 0.8em; margin-top: 4px;
+}
+.count-display { font-size: 0.85em; color: #aaa; margin-top: 2px; }
+
+/* 拡大オーバーレイ */
+#overlay {
+  display: none; position: fixed; inset: 0; background: #1a1a2e;
+  z-index: 100; flex-direction: column; align-items: center;
+}
+#overlay .stack-area { width: 90vw; max-width: 600px; flex: 1; }
+#overlay .click-img { width: 140px; }
+#overlay .btn-count { padding: 12px 30px; font-size: 1.1em; }
+#btnClose {
+  position: absolute; top: 10px; right: 16px;
+  background: none; border: 1px solid #888; color: #fff;
+  padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.9em;
+}
+</style>
+</head>
+<body>
+
+<!-- 画面1 -->
+<div id="screen1">
+  <h1>今回の数字と、前回の数字を入れてね</h1>
+  <div class="input-group">
+    <div class="input-row">
+      <label>🔵 ボトルキャップの数</label>
+      <div class="input-row-set">
+        <input type="number" id="capTotal" min="0" placeholder="今回" value="">
+        <input type="number" id="capPrev1" min="0" placeholder="前回" value="">
+      </div>
+    </div>
+    <div class="input-row">
+      <label>🏷 ペットボトルラベルの数</label>
+      <div class="input-row-set">
+        <input type="number" id="labelTotal" min="0" placeholder="今回" value="">
+        <input type="number" id="labelPrev1" min="0" placeholder="前回" value="">
+      </div>
+    </div>
+    <div class="input-row">
+      <label>🗑 シュレッダーの袋の数</label>
+      <div class="input-row-set">
+        <input type="number" id="shredTotal" min="0" placeholder="今回" value="">
+        <input type="number" id="shredPrev1" min="0" placeholder="前回" value="">
+      </div>
+    </div>
+  </div>
+  <button id="btnStart">決定</button>
+</div>
+
+<!-- 画面2 -->
+<div id="screen2">
+  <div class="columns">
+    <!-- キャップ -->
+    <div class="col" id="colCap">
+      <div class="result-banner" id="bannerCap"><span class="rnum" id="rnumCap"></span></div>
+      <h2>🔵 ボトルキャップ</h2>
+      <div class="stack-area" id="stackCap">
+        <div class="stack-col" id="prevColCap"><div class="stack-col-label">前回</div></div>
+        <div class="stack-col" id="curColCap"><div class="bulb-wrap" id="bulbCap"></div></div>
+      </div>
+      <div class="count-display" id="dispCap">0 / 0</div>
+      <div class="click-wrap"><img src="c.jpg" class="click-img" id="imgCap" alt="キャップ"></div>
+      <button class="btn-count" id="btnCap">キャップカウント</button>
+      <button class="btn-expand" onclick="openOverlay('cap')">拡大</button>
+      <button class="btn-expand" id="btnTogCap" onclick="togglePrev('cap')">前回 非表示</button>
+    </div>
+    <!-- ラベル -->
+    <div class="col" id="colLabel">
+      <div class="result-banner" id="bannerLabel"><span class="rnum" id="rnumLabel"></span></div>
+      <h2>🏷 ラベル</h2>
+      <div class="stack-area" id="stackLabel">
+        <div class="stack-col" id="prevColLabel"><div class="stack-col-label">前回</div></div>
+        <div class="stack-col" id="curColLabel"><div class="bulb-wrap" id="bulbLabel"></div></div>
+      </div>
+      <div class="count-display" id="dispLabel">0 / 0</div>
+      <div class="click-wrap"><img src="r.jpg" class="click-img" id="imgLabel" alt="ラベル"></div>
+      <button class="btn-count" id="btnLabel">ラベルカウント</button>
+      <button class="btn-expand" onclick="openOverlay('label')">拡大</button>
+      <button class="btn-expand" id="btnTogLabel" onclick="togglePrev('label')">前回 非表示</button>
+    </div>
+    <!-- シュレッダー -->
+    <div class="col" id="colShred">
+      <div class="result-banner" id="bannerShred"><span class="rnum" id="rnumShred"></span></div>
+      <h2>🗑 シュレッダー</h2>
+      <div class="stack-area" id="stackShred">
+        <div class="stack-col" id="prevColShred"><div class="stack-col-label">前回</div></div>
+        <div class="stack-col" id="curColShred"><div class="bulb-wrap" id="bulbShred"></div></div>
+      </div>
+      <div class="count-display" id="dispShred">0 / 0</div>
+      <div class="click-wrap"><img src="s.jpg" class="click-img" id="imgShred" alt="袋"></div>
+      <button class="btn-count" id="btnShred">袋カウント</button>
+      <button class="btn-expand" onclick="openOverlay('shred')">拡大</button>
+      <button class="btn-expand" id="btnTogShred" onclick="togglePrev('shred')">前回 非表示</button>
+    </div>
+  </div>
+</div>
+
+<!-- 拡大オーバーレイ -->
+<div id="overlay">
+  <button id="btnClose" onclick="closeOverlay()">✕ 閉じる</button>
+  <h2 id="overlayTitle" style="margin-top:50px;color:#ffd700;"></h2>
+  <div class="stack-area" id="overlayStack" style="width:90vw;max-width:500px;">
+    <div class="stack-col" id="overlayPrev"><div class="stack-col-label">前回</div></div>
+    <div class="stack-col" id="overlayCur"><div class="bulb-wrap" id="bulbOverlay"></div></div>
+  </div>
+  <div class="count-display" id="overlayDisp"></div>
+  <div class="click-wrap"><img src="" class="click-img" id="overlayImg" alt=""></div>
+  <button class="btn-count" id="overlayBtn">カウント</button>
+</div>
+
+<!-- 効果音 -->
+<audio id="sndSeikou" src="seikou.mp3"></audio>
+<audio id="sndSippai" src="sippai.mp3"></audio>
+<!-- 仮装大賞風SE（Web Audio API で生成） -->
+
+<script>
+// ===== 状態 =====
+const state = {
+  cap:   { total: 0, prev: 0, count: 0, img: 'c.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
+  label: { total: 0, prev: 0, count: 0, img: 'r.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
+  shred: { total: 0, prev: 0, count: 0, img: 's.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
+};
+
+let activeCol = null;
+let idleTimer = null;
+let overlayActive = null;
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playKasouSE() {
+  const notes = [523, 659, 784, 1047];
+  notes.forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.value = freq; osc.type = 'square';
+    const t = audioCtx.currentTime + i * 0.09;
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.start(t); osc.stop(t + 0.1);
+  });
+}
+
+function stopAllSE() {
+  document.getElementById('sndSeikou').pause();
+  document.getElementById('sndSippai').pause();
+}
+
+function resetIdleTimer(key) {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    const k = overlayActive || key;
+    const s = state[k];
+    if (s && s.count < s.total) {
+      const el = document.getElementById('sndSippai');
+      el.currentTime = 0; el.play();
+    }
+  }, 3000);
+}
+
+// ===== 画面1 → 画面2 =====
+document.getElementById('btnStart').addEventListener('click', startScreen2);
+
+function startScreen2() {
+  const v = id => parseInt(document.getElementById(id).value) || 0;
+  state.cap.total   = v('capTotal');
+  state.cap.prev    = v('capPrev1');
+  state.label.total = v('labelTotal');
+  state.label.prev  = v('labelPrev1');
+  state.shred.total = v('shredTotal');
+  state.shred.prev  = v('shredPrev1');
+
+  state.cap.curEl    = document.getElementById('curColCap');
+  state.cap.prevEl   = document.getElementById('prevColCap');
+  state.cap.dispEl   = document.getElementById('dispCap');
+  state.cap.bulbEl   = document.getElementById('bulbCap');
+  state.label.curEl  = document.getElementById('curColLabel');
+  state.label.prevEl = document.getElementById('prevColLabel');
+  state.label.dispEl = document.getElementById('dispLabel');
+  state.label.bulbEl = document.getElementById('bulbLabel');
+  state.shred.curEl  = document.getElementById('curColShred');
+  state.shred.prevEl = document.getElementById('prevColShred');
+  state.shred.dispEl = document.getElementById('dispShred');
+  state.shred.bulbEl = document.getElementById('bulbShred');
+
+  document.getElementById('screen1').style.display = 'none';
+  document.getElementById('screen2').style.display = 'block';
+
+  ['cap','label','shred'].forEach(key => {
+    fillPrevCol(state[key].prevEl, state[key]);
+    setupSlots(state[key].curEl, state[key]);
+    buildBulbs(state[key].bulbEl);
+    updateDisp(key);
+  });
+  setupClickSelect();
+  setupButtons();
+  setupKeyboard();
+}
+
+function fillPrevCol(colEl, s) {
+  colEl.querySelectorAll('img').forEach(e => e.remove());
+  const n = Math.min(s.prev, s.total);
+  for (let i = 0; i < n; i++) {
+    const img = document.createElement('img');
+    img.src = s.img; img.className = 'stack-img prev';
+    colEl.insertBefore(img, colEl.querySelector('.stack-col-label'));
+  }
+}
+
+// スロット（空枠）をtotal個分生成。一番上（最後）にgoal-line
+function setupSlots(colEl, s) {
+  colEl.querySelectorAll('.slot,.stack-img.current').forEach(e => e.remove());
+  for (let i = 0; i < s.total; i++) {
+    const d = document.createElement('div');
+    // flex-direction:column-reverse なので appendChild で下から上に積まれる
+    // 最後にappendしたものが一番上 → total-1番目がgoal-line
+    d.className = 'slot' + (i === s.total - 1 ? ' goal-line' : '');
+    colEl.appendChild(d);
+  }
+}
+
+// 電球をcurColの縦幅に合わせてcurCol内の周囲に配置
+function buildBulbs(wrap) {
+  wrap.innerHTML = '';
+  // 通常時は薄い電球を外枠に沿って配置（inset:0）
+  const n = 16;
+  for (let i = 0; i < n; i++) {
+    const b = document.createElement('div');
+    b.className = 'bulb';
+    const side = Math.floor(i / 4);
+    const pos  = (i % 4) / 3;
+    if (side === 0)      { b.style.top = '0%';   b.style.left = (pos * 100) + '%'; }
+    else if (side === 1) { b.style.left = '100%'; b.style.top  = (pos * 100) + '%'; }
+    else if (side === 2) { b.style.top = '100%';  b.style.left = ((1 - pos) * 100) + '%'; }
+    else                 { b.style.left = '0%';   b.style.top  = ((1 - pos) * 100) + '%'; }
+    b.style.animationDelay = (i * 0.075) + 's';
+    wrap.appendChild(b);
+  }
+}
+
+// 合格時：積み上がった画像群の実サイズを測って電球を密着配置
+function repositionBulbs(wrap, colEl) {
+  const imgs = colEl.querySelectorAll('.stack-img.current');
+  if (!imgs.length) return;
+  const colRect  = colEl.getBoundingClientRect();
+  const first    = imgs[0].getBoundingClientRect();   // 一番下の画像
+  const last     = imgs[imgs.length - 1].getBoundingClientRect(); // 一番上
+
+  // curCol内の相対座標に変換
+  const top    = last.top  - colRect.top;
+  const bottom = first.bottom - colRect.top;
+  const left   = last.left - colRect.left;
+  const right  = first.right - colRect.left;
+  const w = right - left;
+  const h = bottom - top;
+
+  wrap.innerHTML = '';
+  // 上下4個・左右8個 = 24個を1周として角の重複なしに配置
+  const sides = [
+    { count: 4, fn: (t) => ({ bx: left + t * w, by: top }) },       // 上
+    { count: 8, fn: (t) => ({ bx: right,          by: top + t * h }) }, // 右
+    { count: 4, fn: (t) => ({ bx: right - t * w,  by: bottom }) },   // 下
+    { count: 8, fn: (t) => ({ bx: left,            by: bottom - t * h }) }, // 左
+  ];
+  let delay = 0;
+  const total = sides.reduce((s, x) => s + x.count, 0);
+  sides.forEach(({ count, fn }) => {
+    for (let i = 0; i < count; i++) {
+      const b = document.createElement('div');
+      b.className = 'bulb';
+      const { bx, by } = fn((i + 0.5) / count); // 0.5オフセットで角を避ける
+      b.style.left = bx + 'px';
+      b.style.top  = by + 'px';
+      b.style.animationDelay = (delay / total * 0.6) + 's';
+      delay++;
+      wrap.appendChild(b);
+    }
+  });
+}
+
+function addCurrentImg(colEl, imgSrc, isSeikou) {
+  // 一番古いスロットを画像で置き換える（下から順に）
+  const slot = colEl.querySelector('.slot');
+  const img = document.createElement('img');
+  img.src = imgSrc;
+  img.className = 'stack-img current' + (isSeikou ? ' seikou' : '');
+  if (slot) {
+    colEl.replaceChild(img, slot);
+  } else {
+    colEl.appendChild(img);
+  }
+}
+
+function triggerSeikou(key) {
+  const s = state[key];
+  const curEl  = overlayActive === key ? document.getElementById('overlayCur') : s.curEl;
+  const bulbEl = overlayActive === key ? document.getElementById('bulbOverlay') : s.bulbEl;
+  curEl.querySelectorAll('.stack-img.current').forEach(el => el.classList.add('seikou'));
+  requestAnimationFrame(() => {
+    repositionBulbs(bulbEl, curEl);
+    bulbEl.classList.add('seikou');
+  });
+  // 成功バナー表示
+  const bannerId = { cap:'bannerCap', label:'bannerLabel', shred:'bannerShred' }[key];
+  const rnumId   = { cap:'rnumCap',   label:'rnumLabel',   shred:'rnumShred'   }[key];
+  const banner = document.getElementById(bannerId);
+  if (banner) {
+    const labels = { cap:'🔵 ボトルキャップ', label:'🏷 ラベル', shred:'🗑 シュレッダー' };
+    banner.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <span style="font-size:clamp(1rem,3vw,2rem);color:#aaa">${labels[key]}</span>
+      <span class="rnum" id="${rnumId}">${s.total}</span>
+    </div>`;
+    banner.classList.add('show');
+  }
+}
+
+// ===== カウント処理 =====
+function doCount(key) {
+  const s = state[key];
+  if (s.count >= s.total) return;
+  s.count++;
+
+  const curEl = overlayActive === key
+    ? document.getElementById('overlayCur')
+    : s.curEl;
+
+  const isSeikou = s.count === s.total;
+  addCurrentImg(curEl, s.img, isSeikou);
+
+  if (isSeikou) {
+    stopAllSE(); clearTimeout(idleTimer);
+    triggerSeikou(key);
+    setTimeout(() => { const e = document.getElementById('sndSeikou'); e.currentTime=0; e.play(); }, 200);
+  } else {
+    playKasouSE();
+    resetIdleTimer(key);
+  }
+
+  updateDisp(key);
+  if (overlayActive === key) updateOverlayDisp(key);
+}
+
+function updateDisp(key) {
+  const s = state[key];
+  s.dispEl.textContent = `${s.count} / ${s.total}`;
+}
+function updateOverlayDisp(key) {
+  const s = state[key];
+  document.getElementById('overlayDisp').textContent = `${s.count} / ${s.total}`;
+}
+
+// ===== クリック選択 =====
+function setupClickSelect() {
+  ['cap','label','shred'].forEach(key => {
+    const imgId = { cap:'imgCap', label:'imgLabel', shred:'imgShred' }[key];
+    document.getElementById(imgId).parentElement.addEventListener('click', () => selectCol(key));
+  });
+}
+
+function selectCol(key) {
+  ['cap','label','shred'].forEach(k => {
+    document.getElementById({ cap:'imgCap', label:'imgLabel', shred:'imgShred' }[k]).classList.remove('selected');
+  });
+  activeCol = key;
+  document.getElementById({ cap:'imgCap', label:'imgLabel', shred:'imgShred' }[key]).classList.add('selected');
+}
+
+function setupButtons() {
+  document.getElementById('btnCap').addEventListener('click',   () => { selectCol('cap');   doCount('cap'); });
+  document.getElementById('btnLabel').addEventListener('click', () => { selectCol('label'); doCount('label'); });
+  document.getElementById('btnShred').addEventListener('click', () => { selectCol('shred'); doCount('shred'); });
+}
+
+function setupKeyboard() {
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && activeCol) { e.preventDefault(); doCount(activeCol); }
+  });
+}
+
+function togglePrev(key) {
+  const s = state[key];
+  const prevEl = s.prevEl;
+  const btnId  = { cap:'btnTogCap', label:'btnTogLabel', shred:'btnTogShred' }[key];
+  const hidden = prevEl.style.display === 'none';
+  prevEl.style.display = hidden ? '' : 'none';
+  document.getElementById(btnId).textContent = hidden ? '前回 非表示' : '前回 表示';
+  // 合格済みなら電球を再配置
+  if (s.count === s.total) {
+    const curEl  = s.curEl;
+    const bulbEl = s.bulbEl;
+    requestAnimationFrame(() => {
+      repositionBulbs(bulbEl, curEl);
+      bulbEl.classList.add('seikou');
+    });
+  }
+}
+
+// ===== 拡大 =====
+function openOverlay(key) {
+  overlayActive = key;
+  const s = state[key];
+  document.getElementById('overlayTitle').textContent =
+    { cap:'🔵 ボトルキャップ', label:'🏷 ラベル', shred:'🗑 シュレッダー' }[key];
+  document.getElementById('overlayImg').src = s.img;
+
+  const prevEl = document.getElementById('overlayPrev');
+  const curEl  = document.getElementById('overlayCur');
+  const bulbEl = document.getElementById('bulbOverlay');
+
+  fillPrevCol(prevEl, s);
+  setupSlots(curEl, s);
+  buildBulbs(bulbEl);
+  if (s.count === s.total) bulbEl.classList.add('seikou');
+  else bulbEl.classList.remove('seikou');
+
+  for (let i = 0; i < s.count; i++) addCurrentImg(curEl, s.img, i === s.total - 1 && s.count === s.total);
+  if (s.count === s.total) curEl.querySelectorAll('.stack-img.current').forEach(el => el.classList.add('seikou'));
+
+  updateOverlayDisp(key);
+  document.getElementById('overlayBtn').onclick = () => doCount(key);
+  document.getElementById('overlayImg').onclick = () => doCount(key);
+  document.getElementById('overlay').style.display = 'flex';
+  selectCol(key);
+}
+
+function closeOverlay() {
+  if (overlayActive) {
+    const key = overlayActive;
+    const s = state[key];
+    setupSlots(s.curEl, s);
+    if (s.count === s.total) { s.bulbEl.classList.add('seikou'); }
+    else s.bulbEl.classList.remove('seikou');
+    for (let i = 0; i < s.count; i++) addCurrentImg(s.curEl, s.img, i === s.total - 1 && s.count === s.total);
+    if (s.count === s.total) s.curEl.querySelectorAll('.stack-img.current').forEach(el => el.classList.add('seikou'));
+    updateDisp(key);
+  }
+  overlayActive = null;
+  document.getElementById('overlay').style.display = 'none';
+}
+</script>
+</body>
+</html>
