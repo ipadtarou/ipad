@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>クイズシステム - スタート</title>
+<style>
+html,body{
+  margin:0;
+  height:100%;
+  overflow:hidden;
+  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-family:sans-serif
+}
+#container{
+  text-align:center;
+  color:white;
+  z-index:10
+}
+h1{
+  font-size:4vw;
+  margin:20px 0 40px 0;
+  text-shadow:2px 2px 4px rgba(0,0,0,0.3)
+}
+.button-group{
+  display:flex;
+  gap:20px;
+  justify-content:center;
+  flex-wrap:wrap;
+  margin:40px 0
+}
+button{
+  padding:20px 40px;
+  font-size:24px;
+  border:none;
+  border-radius:12px;
+  cursor:pointer;
+  transition:all 0.3s;
+  font-weight:bold
+}
+#audioBtn{
+  background:#4CAF50;
+  color:white
+}
+#audioBtn:hover{
+  background:#45a049;
+  transform:scale(1.05)
+}
+#audioBtn:active{
+  transform:scale(0.98)
+}
+#startBtn{
+  background:#2196F3;
+  color:white;
+  font-size:28px;
+  padding:25px 50px
+}
+#startBtn:hover{
+  background:#0b7dda;
+  transform:scale(1.05)
+}
+#startBtn:active{
+  transform:scale(0.98)
+}
+audio{
+  display:none
+}
+</style>
+</head>
+<body>
+<div id="container">
+  <h1>🎮 クイズゲーム 🎮</h1>
+  <p style="font-size:20px;margin-bottom:30px">全9問のクイズに挑戦しましょう！</p>
+  
+  <div class="button-group">
+    <button id="audioBtn">🎵 BGMを再生</button>
+  </div>
+  
+  <div style="margin-top:50px">
+    <button id="startBtn">クイズをスタート</button>
+  </div>
+</div>
+
+<audio id="bgmAudio" src="md.mp3"></audio>
+
+<script>
+const audioBtn = document.getElementById("audioBtn");
+const bgmAudio = document.getElementById("bgmAudio");
+let isPlaying = false;
+
+audioBtn.onclick = () => {
+  if(isPlaying){
+    bgmAudio.pause();
+    bgmAudio.currentTime = 0;
+    isPlaying = false;
+    audioBtn.textContent = "🎵 BGMを再生";
+  } else {
+    bgmAudio.play().catch(()=>{});
+    isPlaying = true;
+    audioBtn.textContent = "⏹ BGM停止";
+  }
+};
+
+document.getElementById("startBtn").onclick = () => {
+  location.href = "bo/s1.html";
+};
+</script>
+</body>
+</html>

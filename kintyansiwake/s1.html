@@ -31,12 +31,17 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
 
 /* === 画面2 === */
 #screen2 { display: none; height: 100vh; position: relative; }
-.columns { display: flex; height: 100vh; }
+.columns { display: flex; height: 100vh; transition: flex-wrap 0.3s; }
+.columns.all-view { flex-wrap: wrap; overflow-y: auto; }
 .col {
   flex: 1; border-right: 2px solid #333; display: flex; flex-direction: column;
   align-items: center; padding: 8px; position: relative; overflow: hidden;
 }
+.columns.all-view .col {
+  flex: 0 1 20%; border-bottom: 2px solid #333; min-height: 50vh;
+}
 .col:last-child { border-right: none; }
+.columns.all-view .col:nth-child(5n) { border-right: 2px solid #333; }
 .col h2 { font-size: 1em; margin-bottom: 4px; color: #ffd700; display: none; }
 
 /* 積み上げエリア：前回と今回を横並び */
@@ -210,6 +215,23 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
   font-size: 0.95em;
   z-index: 20;
 }
+.columns.all-view ~ .page-btn,
+.columns.all-view ~ .page-info {
+  display: none;
+}
+.toggle-view-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.95em;
+  z-index: 20;
+}
 
 /* 拡大オーバーレイ */
 #overlay {
@@ -261,7 +283,7 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
       </div>
     </div>
     <div class="input-row">
-      <label>📦 段ボールの数</label>
+      <label>� 白紙カットの数</label>
       <div class="input-row-set">
         <input type="number" id="paperTotal" min="0" placeholder="今回" value="">
         <input type="number" id="paperPrev1" min="0" placeholder="前回" value="">
@@ -274,6 +296,24 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
 <!-- 画面2 -->
 <div id="screen2">
   <div class="columns">
+    <!-- ペットボトル -->
+    <div class="col" id="colBottle">
+      <div class="result-banner" id="bannerBottle"><span class="rnum" id="rnumBottle"></span></div>
+      <h2>🧴 ペットボトル</h2>
+      <div class="stack-area" id="stackBottle">
+        <div class="stack-col" id="prevColBottle"><div class="stack-col-label">前回</div></div>
+        <div class="stack-col" id="curColBottle"><div class="bulb-wrap" id="bulbBottle"></div></div>
+      </div>
+      <div class="count-display" id="dispBottle">0 / 0</div>
+      <div class="controls">
+        <div class="click-wrap"><img src="petb.jpg" class="click-img" id="imgBottle" alt="ペットボトル"></div>
+        <div class="btn-group">
+          <button class="btn-count" id="btnBottle">ボトルカウント</button>
+          <button class="btn-expand" onclick="openOverlay('bottle')">拡大</button>
+          <button class="btn-expand" id="btnTogBottle" onclick="togglePrev('bottle')">前回 非表示</button>
+        </div>
+      </div>
+    </div>
     <!-- キャップ -->
     <div class="col" id="colCap">
       <div class="result-banner" id="bannerCap"><span class="rnum" id="rnumCap"></span></div>
@@ -284,7 +324,7 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
       </div>
       <div class="count-display" id="dispCap">0 / 0</div>
       <div class="controls">
-        <div class="click-wrap"><img src="c.jpg" class="click-img" id="imgCap" alt="キャップ"></div>
+        <div class="click-wrap"><img src="cap.jpg" class="click-img" id="imgCap" alt="キャップ"></div>
         <div class="btn-group">
           <button class="btn-count" id="btnCap">キャップカウント</button>
           <button class="btn-expand" onclick="openOverlay('cap')">拡大</button>
@@ -302,11 +342,29 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
       </div>
       <div class="count-display" id="dispLabel">0 / 0</div>
       <div class="controls">
-        <div class="click-wrap"><img src="r.jpg" class="click-img" id="imgLabel" alt="ラベル"></div>
+        <div class="click-wrap"><img src="label.jpg" class="click-img" id="imgLabel" alt="ラベル"></div>
         <div class="btn-group">
           <button class="btn-count" id="btnLabel">ラベルカウント</button>
           <button class="btn-expand" onclick="openOverlay('label')">拡大</button>
           <button class="btn-expand" id="btnTogLabel" onclick="togglePrev('label')">前回 非表示</button>
+        </div>
+      </div>
+    </div>
+    <!-- 白紙カット -->
+    <div class="col" id="colPaper">
+      <div class="result-banner" id="bannerPaper"><span class="rnum" id="rnumPaper"></span></div>
+      <h2>📄 白紙カット</h2>
+      <div class="stack-area" id="stackPaper">
+        <div class="stack-col" id="prevColPaper"><div class="stack-col-label">前回</div></div>
+        <div class="stack-col" id="curColPaper"><div class="bulb-wrap" id="bulbPaper"></div></div>
+      </div>
+      <div class="count-display" id="dispPaper">0 / 0</div>
+      <div class="controls">
+        <div class="click-wrap"><img src="paper.jpg" class="click-img" id="imgPaper" alt="白紙カット"></div>
+        <div class="btn-group">
+          <button class="btn-count" id="btnPaper">白紙カウント</button>
+          <button class="btn-expand" onclick="openOverlay('paper')">拡大</button>
+          <button class="btn-expand" id="btnTogPaper" onclick="togglePrev('paper')">前回 非表示</button>
         </div>
       </div>
     </div>
@@ -320,7 +378,7 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
       </div>
       <div class="count-display" id="dispShred">0 / 0</div>
       <div class="controls">
-        <div class="click-wrap"><img src="s.jpg" class="click-img" id="imgShred" alt="袋"></div>
+        <div class="click-wrap"><img src="saidangomi.jpg" class="click-img" id="imgShred" alt="袋"></div>
         <div class="btn-group">
           <button class="btn-count" id="btnShred">袋カウント</button>
           <button class="btn-expand" onclick="openOverlay('shred')">拡大</button>
@@ -328,46 +386,11 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
         </div>
       </div>
     </div>
-    <!-- ペットボトル -->
-    <div class="col" id="colBottle">
-      <div class="result-banner" id="bannerBottle"><span class="rnum" id="rnumBottle"></span></div>
-      <h2>🧴 ペットボトル</h2>
-      <div class="stack-area" id="stackBottle">
-        <div class="stack-col" id="prevColBottle"><div class="stack-col-label">前回</div></div>
-        <div class="stack-col" id="curColBottle"><div class="bulb-wrap" id="bulbBottle"></div></div>
-      </div>
-      <div class="count-display" id="dispBottle">0 / 0</div>
-      <div class="controls">
-        <div class="click-wrap"><img src="c.jpg" class="click-img" id="imgBottle" alt="ペットボトル"></div>
-        <div class="btn-group">
-          <button class="btn-count" id="btnBottle">ボトルカウント</button>
-          <button class="btn-expand" onclick="openOverlay('bottle')">拡大</button>
-          <button class="btn-expand" id="btnTogBottle" onclick="togglePrev('bottle')">前回 非表示</button>
-        </div>
-      </div>
-    </div>
-    <!-- 段ボール -->
-    <div class="col" id="colPaper">
-      <div class="result-banner" id="bannerPaper"><span class="rnum" id="rnumPaper"></span></div>
-      <h2>📦 段ボール</h2>
-      <div class="stack-area" id="stackPaper">
-        <div class="stack-col" id="prevColPaper"><div class="stack-col-label">前回</div></div>
-        <div class="stack-col" id="curColPaper"><div class="bulb-wrap" id="bulbPaper"></div></div>
-      </div>
-      <div class="count-display" id="dispPaper">0 / 0</div>
-      <div class="controls">
-        <div class="click-wrap"><img src="r.jpg" class="click-img" id="imgPaper" alt="段ボール"></div>
-        <div class="btn-group">
-          <button class="btn-count" id="btnPaper">段ボールカウント</button>
-          <button class="btn-expand" onclick="openOverlay('paper')">拡大</button>
-          <button class="btn-expand" id="btnTogPaper" onclick="togglePrev('paper')">前回 非表示</button>
-        </div>
-      </div>
-    </div>
   </div>
   <button class="page-btn page-prev" id="pagePrev" onclick="changePage(-1)">← 前へ</button>
   <button class="page-btn page-next" id="pageNext" onclick="changePage(1)">次へ →</button>
   <div class="page-info" id="pageInfo">1 / 2</div>
+  <button class="toggle-view-btn" id="toggleViewBtn" onclick="toggleViewMode()">全表示</button>
 </div>
 
 <!-- 拡大オーバーレイ -->
@@ -390,13 +413,13 @@ body { font-family: sans-serif; background: #1a1a2e; color: #fff; height: 100vh;
 
 <script>
 // ===== 状態 =====
-const categories = ['cap','label','shred','bottle','paper'];
+const categories = ['bottle','cap','label','paper','shred'];
 const keyToLabel = {
   cap: '🔵 ボトルキャップ',
   label: '🏷 ラベル',
   shred: '🗑 シュレッダー',
   bottle: '🧴 ペットボトル',
-  paper: '📦 段ボール',
+  paper: '� 白紙カット',
 };
 const idMap = {
   cap: 'Cap',
@@ -405,20 +428,21 @@ const idMap = {
   bottle: 'Bottle',
   paper: 'Paper',
 };
-const pageKeys = [['cap','label','shred'], ['bottle','paper']];
+const pageKeys = [['bottle','cap','label'], ['paper','shred']];
 
 const state = {
-  cap:   { total: 0, prev: 0, count: 0, img: 'c.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
-  label: { total: 0, prev: 0, count: 0, img: 'r.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
-  shred: { total: 0, prev: 0, count: 0, img: 's.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
-  bottle:{ total: 0, prev: 0, count: 0, img: 'c.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
-  paper: { total: 0, prev: 0, count: 0, img: 'r.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
+  cap:   { total: 0, prev: 0, count: 0, img: 'cap.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
+  label: { total: 0, prev: 0, count: 0, img: 'label.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
+  shred: { total: 0, prev: 0, count: 0, img: 'saidangomi.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
+  bottle:{ total: 0, prev: 0, count: 0, img: 'petb.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
+  paper: { total: 0, prev: 0, count: 0, img: 'paper.jpg', curEl: null, prevEl: null, dispEl: null, bulbEl: null },
 };
 
 let currentPage = 0;
 let activeCol = null;
 let idleTimer = null;
 let overlayActive = null;
+let allViewMode = false;
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -696,13 +720,18 @@ function setupKeyboard() {
 }
 
 function updatePageView() {
+  const columnsDiv = document.querySelector('.columns');
   categories.forEach(key => {
     const col = document.getElementById('col' + idMap[key]);
     if (!col) return;
-    col.style.display = pageKeys[currentPage].includes(key) ? 'flex' : 'none';
+    if (allViewMode) {
+      col.style.display = 'flex';
+    } else {
+      col.style.display = pageKeys[currentPage].includes(key) ? 'flex' : 'none';
+    }
   });
 
-  if (!pageKeys[currentPage].includes(activeCol)) {
+  if (!allViewMode && !pageKeys[currentPage].includes(activeCol)) {
     activeCol = null;
     categories.forEach(k => document.getElementById('img' + idMap[k]).classList.remove('selected'));
   }
@@ -712,7 +741,24 @@ function updatePageView() {
   document.getElementById('pageNext').disabled = currentPage === pageKeys.length - 1;
 }
 
+function toggleViewMode() {
+  allViewMode = !allViewMode;
+  const columnsDiv = document.querySelector('.columns');
+  const btn = document.getElementById('toggleViewBtn');
+  
+  if (allViewMode) {
+    columnsDiv.classList.add('all-view');
+    btn.textContent = '分割表示';
+  } else {
+    columnsDiv.classList.remove('all-view');
+    btn.textContent = '全表示';
+    currentPage = 0;
+  }
+  updatePageView();
+}
+
 function changePage(delta) {
+  if (allViewMode) return;
   currentPage = Math.min(pageKeys.length - 1, Math.max(0, currentPage + delta));
   updatePageView();
 }

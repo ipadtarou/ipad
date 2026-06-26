@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>クイズ終了 - おめでとう</title>
+<style>
+html,body{
+  margin:0;
+  height:100%;
+  overflow:hidden;
+  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-family:sans-serif
+}
+#container{
+  text-align:center;
+  color:white;
+  animation:popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)
+}
+@keyframes popIn {
+  0%{
+    transform:scale(0.5);
+    opacity:0
+  }
+  100%{
+    transform:scale(1);
+    opacity:1
+  }
+}
+h1{
+  font-size:6vw;
+  margin:20px 0;
+  text-shadow:3px 3px 6px rgba(0,0,0,0.4);
+  animation:bounce 1s ease-in-out
+}
+@keyframes bounce {
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-20px)}
+}
+.confetti{
+  position:fixed;
+  width:10px;
+  height:10px;
+  z-index:1
+}
+p{
+  font-size:28px;
+  margin:40px 0;
+  text-shadow:2px 2px 4px rgba(0,0,0,0.3)
+}
+button{
+  padding:20px 40px;
+  font-size:24px;
+  border:none;
+  border-radius:12px;
+  cursor:pointer;
+  background:#FFD700;
+  color:#333;
+  font-weight:bold;
+  transition:all 0.3s;
+  margin-top:30px
+}
+button:hover{
+  background:#FFC700;
+  transform:scale(1.05)
+}
+button:active{
+  transform:scale(0.98)
+}
+</style>
+</head>
+<body>
+<div id="container">
+  <h1>🎉 完了 🎉</h1>
+  <p>全9問のクイズをクリアしました！</p>
+  <p>おめでとうございます！</p>
+  <button onclick="location.href='start.html'">最初に戻る</button>
+</div>
+
+<script>
+function createConfetti(){
+  for(let i = 0; i < 100; i++){
+    const confetti = document.createElement("div");
+    confetti.className = "confetti";
+    confetti.style.left = Math.random() * window.innerWidth + "px";
+    confetti.style.top = "-20px";
+    confetti.style.background = `hsl(${Math.random() * 360}, 100%, 50%)`;
+    confetti.style.borderRadius = Math.random() > 0.5 ? "50%" : "0";
+    document.body.appendChild(confetti);
+    
+    let x = parseFloat(confetti.style.left);
+    let y = -20;
+    const vx = (Math.random() - 0.5) * 8;
+    const vy = 4 + Math.random() * 5;
+    
+    const t = setInterval(() => {
+      x += vx;
+      y += vy;
+      confetti.style.left = x + "px";
+      confetti.style.top = y + "px";
+      confetti.style.transform = `rotate(${y * 5}deg)`;
+      if(y > window.innerHeight + 50){
+        clearInterval(t);
+        confetti.remove();
+      }
+    }, 16);
+  }
+}
+
+createConfetti();
+setInterval(createConfetti, 800);
+</script>
+</body>
+</html>

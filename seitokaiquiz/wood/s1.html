@@ -119,7 +119,7 @@ position:absolute;width:14px;height:14px
 </head>
 <body>
 <div id="app">
-<video id="video" src="douga.mp4"></video>
+<video id="video" src="douga.mp4" playsinline preload="auto" muted></video>
 <button id="startBtn">次の問題は？</button>
 <button id="nextBtn">次へ</button>
 <button id="bgmBtn">🎵 BGM</button>
@@ -167,6 +167,18 @@ const startBtn=document.getElementById("startBtn");
 const nextBtn=document.getElementById("nextBtn");
 const doorL=document.getElementById("doorL");
 const doorR=document.getElementById("doorR");
+const questionWrap=document.getElementById("questionWrap");
+const hint=document.getElementById("hint");
+const aka=document.getElementById("aka");
+const ao=document.getElementById("ao");
+const doors=document.getElementById("doors");
+const choices=document.getElementById("choices");
+const akaChoice=document.getElementById("akaChoice");
+const aoChoice=document.getElementById("aoChoice");
+const result=document.getElementById("result");
+const resultImg=document.getElementById("resultImg");
+const maru=document.getElementById("maru");
+const oto=document.getElementById("oto");
 
 startBtn.onclick=startQuiz;
 document.addEventListener("keydown",e=>{
@@ -178,7 +190,7 @@ document.addEventListener("keydown",e=>{
 
 nextBtn.onclick=()=>{
  if(stage===4){
-  location.href="2.html";
+  location.href="../end.html";
   return;
  }
  advance();
@@ -188,7 +200,33 @@ function startQuiz(){
  startBtn.style.display="none";
  const video = document.getElementById("video");
  video.style.display = "block";
- video.play().catch(()=>{});
+ video.currentTime=0;
+ 
+ // 音量を動画再生後に戻す
+ const originalVolume = video.volume;
+ 
+ const playPromise = video.play();
+ if(playPromise !== undefined){
+  playPromise
+   .then(() => {
+    // 再生成功
+    console.log("動画再生開始");
+   })
+   .catch(error => {
+    console.error("動画再生エラー:", error);
+    // フォールバック: エラー時は次に進む
+    setTimeout(() => {
+     video.style.display = "none";
+     document.getElementById("jajan").play().catch(()=>{});
+     nextBtn.style.display="block";
+     questionWrap.classList.remove("bottomMode");
+     questionWrap.style.opacity=1;
+     setTimeout(()=>hint.style.opacity=1,500);
+     stage=1;
+    }, 500);
+   });
+ }
+ 
  video.onended = () => {
   video.style.display = "none";
   document.getElementById("jajan").play().catch(()=>{});
