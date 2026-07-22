@@ -20,7 +20,7 @@ const uiController = new UIController({
   sidePanel,
   statusBar,
   form: {
-    objectId: document.createElement("input"),
+    objectId: document.getElementById("field-object-id"),
     name: document.getElementById("field-name"),
     text: document.getElementById("field-text"),
     voice: document.getElementById("field-voice"),

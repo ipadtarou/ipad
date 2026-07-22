@@ -10,6 +10,9 @@ export class CanvasController {
     this.dragState = null;
     this.hoveredObjectId = null;
     this.onCreate = options.onCreate || null;
+    this.highlightPulse = 0;
+    this.highlightTimer = null;
+    this.highlightedObjectId = null;
   }
 
   setImage(image) {
@@ -25,6 +28,42 @@ export class CanvasController {
   setZoom(zoom) {
     this.zoom = zoom;
     this.render();
+  }
+
+  setSelection(objectId, animate = false) {
+    this.selectedObjectId = objectId;
+    if (animate) {
+      this.startHighlight(objectId);
+    } else {
+      this.clearHighlight();
+    }
+    this.render();
+  }
+
+  clearSelection() {
+    this.selectedObjectId = null;
+    this.clearHighlight();
+    this.render();
+  }
+
+  startHighlight(objectId) {
+    this.highlightedObjectId = objectId;
+    if (this.highlightTimer) {
+      clearInterval(this.highlightTimer);
+    }
+    this.highlightPulse = 0;
+    this.highlightTimer = window.setInterval(() => {
+      this.highlightPulse += 0.2;
+      this.render();
+    }, 60);
+  }
+
+  clearHighlight() {
+    this.highlightedObjectId = null;
+    if (this.highlightTimer) {
+      clearInterval(this.highlightTimer);
+      this.highlightTimer = null;
+    }
   }
 
   resize(width, height) {
@@ -75,9 +114,21 @@ export class CanvasController {
 
     const { x, y, w, h } = rect;
     this.ctx.save();
-    this.ctx.strokeStyle = isSelected ? "#ff0000" : color;
-    this.ctx.lineWidth = isSelected ? 3 : 2;
-    this.ctx.setLineDash(isSelected ? [6, 4] : []);
+    if (isSelected) {
+      const pulse = Math.sin(this.highlightPulse) * 4 + 6;
+      this.ctx.fillStyle = "rgba(37, 99, 235, 0.12)";
+      this.ctx.fillRect((x - pulse) * this.zoom, (y - pulse) * this.zoom, (w + pulse * 2) * this.zoom, (h + pulse * 2) * this.zoom);
+      this.ctx.strokeStyle = "#2563eb";
+      this.ctx.lineWidth = 3;
+      this.ctx.setLineDash([7, 4]);
+      this.ctx.strokeRect((x - pulse) * this.zoom, (y - pulse) * this.zoom, (w + pulse * 2) * this.zoom, (h + pulse * 2) * this.zoom);
+      this.ctx.restore();
+      return;
+    }
+
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = 2;
+    this.ctx.setLineDash([]);
     this.ctx.strokeRect(x * this.zoom, y * this.zoom, w * this.zoom, h * this.zoom);
     this.ctx.restore();
   }

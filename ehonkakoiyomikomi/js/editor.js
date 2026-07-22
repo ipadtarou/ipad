@@ -30,7 +30,7 @@ export class EditorController {
 
   selectObject(objectId) {
     this.selectedObjectId = objectId;
-    this.canvasController.selectedObjectId = objectId;
+    this.canvasController.setSelection(objectId, true);
     const object = this.objects.find((entry) => entry.id === objectId);
     this.selectedObject = object || null;
     if (object) {
@@ -64,8 +64,13 @@ export class EditorController {
 
     this.selectedObject = nextObject;
     this.canvasController.setObjects(this.objects);
-    await this.firestore.saveObject(this.imageId, nextObject);
-    this.uiController.setStatus("保存しました");
+    const saveResult = await this.firestore.saveObject(this.imageId, nextObject);
+    const savedToFirestore = saveResult?.savedToFirestore !== false;
+    this.uiController.setStatus(
+      savedToFirestore
+        ? "保存しました"
+        : "保存しましたが、Firestore への書き込みに失敗しました。Firebase のルールを確認してください。"
+    );
     this.selectObject(nextObject.id);
   }
 
@@ -75,10 +80,12 @@ export class EditorController {
     }
 
     this.objects = this.objects.filter((entry) => entry.id !== this.selectedObjectId);
-    await this.firestore.deleteObject(this.imageId, this.selectedObjectId);
+    const deleteResult = await this.firestore.deleteObject(this.imageId, this.selectedObjectId);
     this.canvasController.setObjects(this.objects);
     this.uiController.hidePanel();
-    this.uiController.setStatus("削除しました");
+    this.uiController.setStatus(
+      deleteResult?.savedToFirestore !== false ? "削除しました" : "削除しましたが、Firestore からの更新に失敗しました。"
+    );
   }
 
   handleCanvasPointerDown(point) {
@@ -116,8 +123,7 @@ export class EditorController {
     if (!object) {
       this.uiController.hidePanel();
       this.selectedObjectId = null;
-      this.canvasController.selectedObjectId = null;
-      this.canvasController.render();
+      this.canvasController.clearSelection();
     }
   }
 }
