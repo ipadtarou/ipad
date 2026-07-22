@@ -24,6 +24,7 @@ export async function initializeFirebase() {
     const app = initializeApp(config);
     const db = getFirestore(app);
     cachedContext = { ready: true, provider: "firebase", app, db };
+    console.info("Firebase initialized", config.projectId);
     return cachedContext;
   } catch (error) {
     console.warn("Firebase SDK の読み込みに失敗したため、ローカルモックで動作します。", error);

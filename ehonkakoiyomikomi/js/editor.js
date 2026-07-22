@@ -66,6 +66,7 @@ export class EditorController {
     this.canvasController.setObjects(this.objects);
     const saveResult = await this.firestore.saveObject(this.imageId, nextObject);
     const savedToFirestore = saveResult?.savedToFirestore !== false;
+    console.info("saveCurrentObject result", saveResult);
     this.uiController.setStatus(
       savedToFirestore
         ? "保存しました"
@@ -90,6 +91,7 @@ export class EditorController {
 
   handleCanvasPointerDown(point) {
     if (this.mode !== "edit") {
+      this.canvasController.handleCanvasTap(point);
       return;
     }
 
@@ -116,6 +118,7 @@ export class EditorController {
 
   handleCanvasClick(point) {
     if (this.mode !== "edit") {
+      this.canvasController.handleCanvasTap(point);
       return;
     }
 
@@ -125,5 +128,25 @@ export class EditorController {
       this.selectedObjectId = null;
       this.canvasController.clearSelection();
     }
+  }
+
+  speakObject(object) {
+    const parts = [];
+    if (object?.name) {
+      parts.push(object.name);
+    }
+    if (object?.text) {
+      parts.push(object.text);
+    }
+    const sentence = parts.join("。" );
+    if (!sentence) {
+      return;
+    }
+
+    this.uiController.setStatus(sentence);
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(sentence);
+    utterance.lang = "ja-JP";
+    window.speechSynthesis.speak(utterance);
   }
 }

@@ -10,6 +10,7 @@ export class CanvasController {
     this.dragState = null;
     this.hoveredObjectId = null;
     this.onCreate = options.onCreate || null;
+    this.onTapObject = options.onTapObject || null;
     this.highlightPulse = 0;
     this.highlightTimer = null;
     this.highlightedObjectId = null;
@@ -242,5 +243,12 @@ export class CanvasController {
 
     this.dragState = null;
     this.render();
+  }
+
+  handleCanvasTap(point) {
+    const object = this.findObjectAt(point);
+    if (object) {
+      this.onTapObject?.(object);
+    }
   }
 }

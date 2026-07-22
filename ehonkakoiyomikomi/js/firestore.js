@@ -44,7 +44,9 @@ async function loadFromFirestore(imageId) {
 
 async function saveToFirestore(imageId, objects) {
   const context = await getFirebaseContext();
+  console.info("saveToFirestore start", { imageId, objects, context });
   if (!context.ready || !context.db) {
+    console.warn("saveToFirestore: Firebase not ready", context);
     return null;
   }
 
@@ -53,11 +55,13 @@ async function saveToFirestore(imageId, objects) {
     const q = query(collection(context.db, "objects"), where("image", "==", imageId));
     const snapshot = await getDocs(q);
     const existingIds = snapshot.docs.map((docSnap) => docSnap.id);
+    console.info("saveToFirestore existing ids", existingIds);
 
     for (const object of objects) {
       const docId = object.id || `${imageId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const normalized = { ...object, id: docId, image: imageId };
       await setDoc(doc(context.db, "objects", docId), normalized);
+      console.info("saveToFirestore wrote", docId, normalized);
     }
 
     for (const existingId of existingIds) {
@@ -68,7 +72,7 @@ async function saveToFirestore(imageId, objects) {
 
     return objects;
   } catch (error) {
-    console.warn("Firestore への保存に失敗したため、ローカル保存にフォールバックします。", error);
+    console.error("Firestore への保存に失敗したため、ローカル保存にフォールバックします。", error);
     return null;
   }
 }
@@ -110,13 +114,14 @@ export async function loadObjects(imageId) {
 
 export async function saveObjects(imageId, objects) {
   const firestoreResult = await saveToFirestore(imageId, objects);
+  const result = firestoreResult ? { ...objects, savedToFirestore: true } : { ...objects, savedToFirestore: false };
   if (firestoreResult) {
     writeStoredObjects(imageId, objects);
-    return objects;
+    return result;
   }
 
   writeStoredObjects(imageId, objects);
-  return objects;
+  return result;
 }
 
 export async function saveObject(imageId, object) {

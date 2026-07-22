@@ -14,6 +14,11 @@ const canvasController = new CanvasController(canvas, {
   onCreate: (object) => {
     editorController?.selectObject(object.id);
   },
+  onTapObject: (object) => {
+    if (editorController?.mode === "view") {
+      editorController.speakObject(object);
+    }
+  },
 });
 const uiController = new UIController({
   canvas,
@@ -50,12 +55,19 @@ function resizeCanvas() {
   canvasController.resize(width, height);
 }
 
+function setActiveToolbarButton(action) {
+  document.querySelectorAll(".toolbar button[data-action]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.action === action);
+  });
+}
+
 window.addEventListener("resize", resizeCanvas);
 
 async function bootstrap() {
   const firebaseStatus = await initializeFirebase();
   console.info("Firebase status:", firebaseStatus);
   resizeCanvas();
+  setActiveToolbarButton("edit-mode");
   await editorController.loadImage("01");
   uiController.bindEvents({
     onSave: () => editorController.saveCurrentObject(),
@@ -94,10 +106,12 @@ async function bootstrap() {
 
   document.querySelector("[data-action='view-mode']").addEventListener("click", () => {
     editorController.setMode("view");
+    setActiveToolbarButton("view-mode");
   });
 
   document.querySelector("[data-action='edit-mode']").addEventListener("click", () => {
     editorController.setMode("edit");
+    setActiveToolbarButton("edit-mode");
   });
 
   window.addEventListener("keydown", (event) => {
