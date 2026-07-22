@@ -1,9 +1,11 @@
 import { initializeFirebase } from "./firebase.js";
 import { loadObjects } from "./firestore.js";
+import { getSpeechVoices, populateVoiceSelect, resolveVoice } from "./voice.js";
 
 const canvas = document.getElementById("viewer-canvas");
 const ctx = canvas.getContext("2d");
 const zoomSelect = document.getElementById("zoom-select");
+const voiceSelect = document.getElementById("voice-select");
 const currentLabel = document.getElementById("current-label");
 const startButton = document.getElementById("start-read");
 const stopButton = document.getElementById("stop-read");
@@ -81,7 +83,7 @@ function stopHighlight() {
   }
 }
 
-function speakObject(object) {
+async function speakObject(object) {
   const parts = [];
   if (object.name) {
     parts.push(object.name);
@@ -94,9 +96,14 @@ function speakObject(object) {
     return;
   }
   currentLabel.textContent = sentence;
+  const voices = await getSpeechVoices();
+  const selectedVoice = resolveVoice(object.voice || voiceSelect?.value, voices);
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(sentence);
   utterance.lang = "ja-JP";
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+  }
   utterance.onend = () => {
     if (!reading) {
       return;
@@ -155,6 +162,8 @@ window.addEventListener("resize", resizeCanvas);
 
 async function bootstrap() {
   await initializeFirebase();
+  const voices = await getSpeechVoices();
+  populateVoiceSelect(voiceSelect, voices, "");
   resizeCanvas();
   await loadImage("01");
 }

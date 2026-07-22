@@ -1,3 +1,5 @@
+import { populateVoiceSelect } from "./voice.js";
+
 export class UIController {
   constructor({ canvas, sidePanel, statusBar, form }) {
     this.canvas = canvas;
@@ -40,8 +42,11 @@ export class UIController {
     };
   }
 
+  setVoiceOptions(voices = [], selectedValue = "") {
+    populateVoiceSelect(this.form.voice, voices, selectedValue);
+  }
+
   bindEvents({ onSave, onDelete, onClose, onZoomChange }) {
-    document.querySelector("[data-action='save']").addEventListener("click", onSave);
     document.querySelector("[data-action='edit-mode']").addEventListener("click", () => onZoomChange && onZoomChange(1));
     document.querySelector("[data-action='view-mode']").addEventListener("click", () => onZoomChange && onZoomChange(1));
     document.getElementById("save-object").addEventListener("click", onSave);

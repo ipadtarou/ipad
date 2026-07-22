@@ -1,3 +1,5 @@
+import { getSpeechVoices, resolveVoice } from "./voice.js";
+
 export class EditorController {
   constructor({ canvasController, uiController, firestore, onChange }) {
     this.canvasController = canvasController;
@@ -25,6 +27,8 @@ export class EditorController {
 
   setMode(mode) {
     this.mode = mode;
+    this.canvasController.clearHighlight();
+    this.canvasController.clearSelection();
     this.uiController.setStatus(mode === "edit" ? "編集モード" : "閲覧モード");
   }
 
@@ -91,7 +95,10 @@ export class EditorController {
 
   handleCanvasPointerDown(point) {
     if (this.mode !== "edit") {
-      this.canvasController.handleCanvasTap(point);
+      const object = this.canvasController.findObjectAt(point);
+      if (object) {
+        this.speakObject(object);
+      }
       return;
     }
 
@@ -118,7 +125,10 @@ export class EditorController {
 
   handleCanvasClick(point) {
     if (this.mode !== "edit") {
-      this.canvasController.handleCanvasTap(point);
+      const object = this.canvasController.findObjectAt(point);
+      if (object) {
+        this.speakObject(object);
+      }
       return;
     }
 
@@ -130,7 +140,7 @@ export class EditorController {
     }
   }
 
-  speakObject(object) {
+  async speakObject(object) {
     const parts = [];
     if (object?.name) {
       parts.push(object.name);
@@ -143,10 +153,21 @@ export class EditorController {
       return;
     }
 
+    const voices = await getSpeechVoices();
+    const selectedVoice = resolveVoice(object?.voice || this.uiController.form.voice?.value, voices);
+
     this.uiController.setStatus(sentence);
+    this.canvasController.highlightObject(object.id);
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(sentence);
     utterance.lang = "ja-JP";
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+    utterance.onend = () => {
+      this.canvasController.clearHighlight();
+      this.canvasController.render();
+    };
     window.speechSynthesis.speak(utterance);
   }
 }

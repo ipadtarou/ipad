@@ -4,6 +4,7 @@ import { CanvasController } from "./canvas.js";
 import { EditorController } from "./editor.js";
 import { UIController } from "./ui.js";
 import { ViewerController } from "./viewer.js";
+import { getSpeechVoices } from "./voice.js";
 
 const canvas = document.getElementById("main-canvas");
 const sidePanel = document.getElementById("side-panel");
@@ -68,6 +69,8 @@ async function bootstrap() {
   console.info("Firebase status:", firebaseStatus);
   resizeCanvas();
   setActiveToolbarButton("edit-mode");
+  const voices = await getSpeechVoices();
+  uiController.setVoiceOptions(voices);
   await editorController.loadImage("01");
   uiController.bindEvents({
     onSave: () => editorController.saveCurrentObject(),

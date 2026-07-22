@@ -47,6 +47,12 @@ export class CanvasController {
     this.render();
   }
 
+  highlightObject(objectId) {
+    this.highlightedObjectId = objectId;
+    this.startHighlight(objectId);
+    this.render();
+  }
+
   startHighlight(objectId) {
     this.highlightedObjectId = objectId;
     if (this.highlightTimer) {
@@ -93,7 +99,7 @@ export class CanvasController {
         continue;
       }
 
-      const isSelected = object.id === this.selectedObjectId;
+      const isSelected = object.id === this.selectedObjectId || object.id === this.highlightedObjectId;
       this.drawObject(object, isSelected);
     }
 
