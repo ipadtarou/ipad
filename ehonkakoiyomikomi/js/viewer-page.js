@@ -15,6 +15,8 @@ let currentIndex = 0;
 let reading = false;
 let readingTimer = null;
 let lastSpokenObjectId = null;
+let highlightPulse = 0;
+let highlightTimer = null;
 
 function resizeCanvas() {
   const width = Math.max(700, window.innerWidth * 0.6);
@@ -43,11 +45,39 @@ function render() {
     }
     const isActive = object.id === lastSpokenObjectId;
     ctx.save();
-    ctx.strokeStyle = isActive ? "#2563eb" : object.color || "#00ff00";
-    ctx.lineWidth = isActive ? 4 : 2;
-    ctx.setLineDash(isActive ? [8, 4] : []);
-    ctx.strokeRect(object.x * zoom, object.y * zoom, object.w * zoom, object.h * zoom);
+    if (isActive) {
+      const pulse = Math.sin(highlightPulse) * 4 + 6;
+      ctx.fillStyle = "rgba(37, 99, 235, 0.12)";
+      ctx.fillRect((object.x - pulse) * zoom, (object.y - pulse) * zoom, (object.w + pulse * 2) * zoom, (object.h + pulse * 2) * zoom);
+      ctx.strokeStyle = "#2563eb";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([8, 4]);
+      ctx.strokeRect((object.x - pulse) * zoom, (object.y - pulse) * zoom, (object.w + pulse * 2) * zoom, (object.h + pulse * 2) * zoom);
+    } else {
+      ctx.strokeStyle = object.color || "#00ff00";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.strokeRect(object.x * zoom, object.y * zoom, object.w * zoom, object.h * zoom);
+    }
     ctx.restore();
+  }
+}
+
+function startHighlight() {
+  if (highlightTimer) {
+    clearInterval(highlightTimer);
+  }
+  highlightPulse = 0;
+  highlightTimer = window.setInterval(() => {
+    highlightPulse += 0.2;
+    render();
+  }, 60);
+}
+
+function stopHighlight() {
+  if (highlightTimer) {
+    clearInterval(highlightTimer);
+    highlightTimer = null;
   }
 }
 
@@ -75,6 +105,7 @@ function speakObject(object) {
     playNext();
   };
   lastSpokenObjectId = object.id;
+  startHighlight();
   render();
   window.speechSynthesis.speak(utterance);
 }
@@ -110,6 +141,7 @@ startButton.addEventListener("click", async () => {
 
 stopButton.addEventListener("click", () => {
   reading = false;
+  stopHighlight();
   window.speechSynthesis.cancel();
   currentLabel.textContent = "停止しました";
 });
@@ -126,5 +158,20 @@ async function bootstrap() {
   resizeCanvas();
   await loadImage("01");
 }
+
+canvas.addEventListener("click", async (event) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / zoom;
+  const y = (event.clientY - rect.top) / zoom;
+  const object = objects.find((entry) => {
+    if (!entry.visible) {
+      return false;
+    }
+    return x >= entry.x && x <= entry.x + entry.w && y >= entry.y && y <= entry.y + entry.h;
+  });
+  if (object) {
+    speakObject(object);
+  }
+});
 
 bootstrap();
