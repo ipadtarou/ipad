@@ -12,6 +12,7 @@ export class EditorController {
     this.selectedObject = null;
     this.mode = "edit";
     this.history = [];
+    this.pointerHandledByDown = false;
   }
 
   async loadImage(imageId) {
@@ -97,7 +98,10 @@ export class EditorController {
     if (this.mode !== "edit") {
       const object = this.canvasController.findObjectAt(point);
       if (object) {
+        this.pointerHandledByDown = true;
         this.speakObject(object);
+      } else {
+        this.pointerHandledByDown = false;
       }
       return;
     }
@@ -125,6 +129,10 @@ export class EditorController {
 
   handleCanvasClick(point) {
     if (this.mode !== "edit") {
+      if (this.pointerHandledByDown) {
+        this.pointerHandledByDown = false;
+        return;
+      }
       const object = this.canvasController.findObjectAt(point);
       if (object) {
         this.speakObject(object);
@@ -140,7 +148,7 @@ export class EditorController {
     }
   }
 
-  async speakObject(object) {
+  buildSpeechSentence(object) {
     const parts = [];
     if (object?.name) {
       parts.push(object.name);
@@ -148,7 +156,11 @@ export class EditorController {
     if (object?.text) {
       parts.push(object.text);
     }
-    const sentence = parts.join("。" );
+    return parts.join("。" );
+  }
+
+  async speakObject(object) {
+    const sentence = this.buildSpeechSentence(object);
     if (!sentence) {
       return;
     }

@@ -19,6 +19,7 @@ let readingTimer = null;
 let lastSpokenObjectId = null;
 let highlightPulse = 0;
 let highlightTimer = null;
+let playbackToken = 0;
 
 function resizeCanvas() {
   const width = Math.max(700, window.innerWidth * 0.6);
@@ -83,18 +84,28 @@ function stopHighlight() {
   }
 }
 
-async function speakObject(object) {
+function buildSpeechSentence(object) {
   const parts = [];
-  if (object.name) {
+  if (object?.name) {
     parts.push(object.name);
   }
-  if (object.text) {
+  if (object?.text) {
     parts.push(object.text);
   }
-  const sentence = parts.join("。" );
+  return parts.join("。" );
+}
+
+async function speakObject(object, { autoContinue = false } = {}) {
+  const sentence = buildSpeechSentence(object);
   if (!sentence) {
+    if (autoContinue) {
+      currentIndex += 1;
+      playNext();
+    }
     return;
   }
+  playbackToken += 1;
+  const token = playbackToken;
   currentLabel.textContent = sentence;
   const voices = await getSpeechVoices();
   const selectedVoice = resolveVoice(object.voice || voiceSelect?.value, voices);
@@ -105,11 +116,13 @@ async function speakObject(object) {
     utterance.voice = selectedVoice;
   }
   utterance.onend = () => {
-    if (!reading) {
+    if (token !== playbackToken || !reading) {
       return;
     }
-    currentIndex += 1;
-    playNext();
+    if (autoContinue) {
+      currentIndex += 1;
+      playNext();
+    }
   };
   lastSpokenObjectId = object.id;
   startHighlight();
@@ -121,13 +134,20 @@ function playNext() {
   if (!reading) {
     return;
   }
-  const object = objects[currentIndex];
-  if (!object) {
-    reading = false;
-    currentLabel.textContent = "読み終わりました";
-    return;
+
+  let index = currentIndex;
+  while (index < objects.length) {
+    const object = objects[index];
+    if (object && object.visible !== false && buildSpeechSentence(object)) {
+      currentIndex = index;
+      speakObject(object, { autoContinue: true });
+      return;
+    }
+    index += 1;
   }
-  speakObject(object);
+
+  reading = false;
+  currentLabel.textContent = "読み終わりました";
 }
 
 async function loadImage(imageId) {
@@ -148,6 +168,7 @@ startButton.addEventListener("click", async () => {
 
 stopButton.addEventListener("click", () => {
   reading = false;
+  playbackToken += 1;
   stopHighlight();
   window.speechSynthesis.cancel();
   currentLabel.textContent = "停止しました";
@@ -168,7 +189,8 @@ async function bootstrap() {
   await loadImage("01");
 }
 
-canvas.addEventListener("click", async (event) => {
+canvas.addEventListener("pointerdown", async (event) => {
+  event.preventDefault();
   const rect = canvas.getBoundingClientRect();
   const x = (event.clientX - rect.left) / zoom;
   const y = (event.clientY - rect.top) / zoom;
@@ -179,7 +201,8 @@ canvas.addEventListener("click", async (event) => {
     return x >= entry.x && x <= entry.x + entry.w && y >= entry.y && y <= entry.y + entry.h;
   });
   if (object) {
-    speakObject(object);
+    reading = true;
+    await speakObject(object, { autoContinue: false });
   }
 });
 
