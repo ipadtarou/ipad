@@ -4,18 +4,12 @@ import { getSpeechVoices, resolveVoice } from "./voice.js";
 
 const canvas = document.getElementById("viewer-canvas");
 const ctx = canvas.getContext("2d");
-const currentLabel = document.getElementById("current-label");
-const startButton = document.getElementById("start-read");
-const stopButton = document.getElementById("stop-read");
 
 let image = null;
 let objects = [];
 let imageScale = 1;
 let imageOffsetX = 0;
 let imageOffsetY = 0;
-let currentIndex = 0;
-let reading = false;
-let readingTimer = null;
 let lastSpokenObjectId = null;
 let highlightPulse = 0;
 let highlightTimer = null;
@@ -117,7 +111,6 @@ async function speakObject(object, { autoContinue = false } = {}) {
   }
   playbackToken += 1;
   const token = playbackToken;
-  currentLabel.textContent = sentence;
   const selectedVoice = resolveVoice(object.voice || null, voices);
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(sentence);
@@ -126,7 +119,7 @@ async function speakObject(object, { autoContinue = false } = {}) {
     utterance.voice = selectedVoice;
   }
   utterance.onend = () => {
-    if (token !== playbackToken || !reading) {
+    if (token !== playbackToken) {
       return;
     }
     if (autoContinue) {
@@ -156,8 +149,6 @@ function playNext() {
     index += 1;
   }
 
-  reading = false;
-  currentLabel.textContent = "読み終わりました";
 }
 
 async function loadImage(imageId) {
@@ -169,20 +160,6 @@ async function loadImage(imageId) {
   render();
 }
 
-startButton.addEventListener("click", async () => {
-  reading = true;
-  currentIndex = 0;
-  await loadImage("01");
-  playNext();
-});
-
-stopButton.addEventListener("click", () => {
-  reading = false;
-  playbackToken += 1;
-  stopHighlight();
-  window.speechSynthesis.cancel();
-  currentLabel.textContent = "停止しました";
-});
 
 window.addEventListener("resize", resizeCanvas);
 

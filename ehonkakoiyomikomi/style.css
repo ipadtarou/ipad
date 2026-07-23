@@ -158,26 +158,6 @@ select {
   border-radius: 6px;
 }
 
-.color-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.transparent-button {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #f8fafc;
-  padding: 8px 10px;
-  cursor: pointer;
-  color: #111827;
-}
-
-.transparent-button.active {
-  background: #111827;
-  color: white;
-  border-color: #111827;
-}
 
 textarea {
   min-height: 90px;

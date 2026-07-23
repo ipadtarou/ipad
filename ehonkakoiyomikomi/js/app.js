@@ -31,7 +31,6 @@ const uiController = new UIController({
     text: document.getElementById("field-text"),
     voice: document.getElementById("field-voice"),
     color: document.getElementById("field-color"),
-    transparent: document.getElementById("field-transparent"),
     visible: document.getElementById("field-visible"),
     order: document.getElementById("field-order"),
   },
