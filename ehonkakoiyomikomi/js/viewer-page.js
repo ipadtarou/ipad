@@ -1,18 +1,18 @@
 import { initializeFirebase } from "./firebase.js";
 import { loadObjects } from "./firestore.js";
-import { getSpeechVoices, populateVoiceSelect, resolveVoice } from "./voice.js";
+import { getSpeechVoices, resolveVoice } from "./voice.js";
 
 const canvas = document.getElementById("viewer-canvas");
 const ctx = canvas.getContext("2d");
-const zoomSelect = document.getElementById("zoom-select");
-const voiceSelect = document.getElementById("voice-select");
 const currentLabel = document.getElementById("current-label");
 const startButton = document.getElementById("start-read");
 const stopButton = document.getElementById("stop-read");
 
 let image = null;
 let objects = [];
-let zoom = 1;
+let imageScale = 1;
+let imageOffsetX = 0;
+let imageOffsetY = 0;
 let currentIndex = 0;
 let reading = false;
 let readingTimer = null;
@@ -23,8 +23,9 @@ let playbackToken = 0;
 let voices = [];
 
 function resizeCanvas() {
-  const width = Math.max(700, window.innerWidth * 0.6);
-  const height = Math.max(500, window.innerHeight * 0.68);
+  const area = canvas.parentElement;
+  const width = Math.floor(area.clientWidth);
+  const height = Math.floor(area.clientHeight);
   canvas.width = width;
   canvas.height = height;
   render();
@@ -37,9 +38,13 @@ function render() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (image) {
+    imageScale = Math.min(canvas.width / image.width, canvas.height / image.height);
+    imageOffsetX = (canvas.width - image.width * imageScale) / 2;
+    imageOffsetY = (canvas.height - image.height * imageScale) / 2;
     ctx.save();
-    ctx.scale(zoom, zoom);
-    ctx.drawImage(image, 0, 0, image.width, image.height);
+    ctx.translate(imageOffsetX, imageOffsetY);
+    ctx.scale(imageScale, imageScale);
+    ctx.drawImage(image, 0, 0);
     ctx.restore();
   }
 
@@ -49,19 +54,23 @@ function render() {
     }
     const isActive = object.id === lastSpokenObjectId;
     ctx.save();
+    const x = object.x * imageScale + imageOffsetX;
+    const y = object.y * imageScale + imageOffsetY;
+    const w = object.w * imageScale;
+    const h = object.h * imageScale;
     if (isActive) {
       const pulse = Math.sin(highlightPulse) * 4 + 6;
       ctx.fillStyle = "rgba(37, 99, 235, 0.12)";
-      ctx.fillRect((object.x - pulse) * zoom, (object.y - pulse) * zoom, (object.w + pulse * 2) * zoom, (object.h + pulse * 2) * zoom);
+      ctx.fillRect(x - pulse, y - pulse, w + pulse * 2, h + pulse * 2);
       ctx.strokeStyle = "#2563eb";
       ctx.lineWidth = 4;
       ctx.setLineDash([8, 4]);
-      ctx.strokeRect((object.x - pulse) * zoom, (object.y - pulse) * zoom, (object.w + pulse * 2) * zoom, (object.h + pulse * 2) * zoom);
+      ctx.strokeRect(x - pulse, y - pulse, w + pulse * 2, h + pulse * 2);
     } else {
       ctx.strokeStyle = object.color || "#00ff00";
       ctx.lineWidth = 2;
       ctx.setLineDash([]);
-      ctx.strokeRect(object.x * zoom, object.y * zoom, object.w * zoom, object.h * zoom);
+      ctx.strokeRect(x, y, w, h);
     }
     ctx.restore();
   }
@@ -108,7 +117,7 @@ async function speakObject(object, { autoContinue = false } = {}) {
   playbackToken += 1;
   const token = playbackToken;
   currentLabel.textContent = sentence;
-  const selectedVoice = resolveVoice(object.voice || voiceSelect?.value, voices);
+  const selectedVoice = resolveVoice(object.voice || null, voices);
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(sentence);
   utterance.lang = "ja-JP";
@@ -174,17 +183,11 @@ stopButton.addEventListener("click", () => {
   currentLabel.textContent = "停止しました";
 });
 
-zoomSelect.addEventListener("change", (event) => {
-  zoom = Number(event.target.value);
-  render();
-});
-
 window.addEventListener("resize", resizeCanvas);
 
 async function bootstrap() {
   await initializeFirebase();
   voices = await getSpeechVoices();
-  populateVoiceSelect(voiceSelect, voices, "");
   resizeCanvas();
   await loadImage("01");
   if (voices.length > 0) {
@@ -201,8 +204,8 @@ async function bootstrap() {
 canvas.addEventListener("pointerdown", async (event) => {
   event.preventDefault();
   const rect = canvas.getBoundingClientRect();
-  const x = (event.clientX - rect.left) / zoom;
-  const y = (event.clientY - rect.top) / zoom;
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
   const object = objects
     .slice()
     .reverse()
@@ -213,7 +216,9 @@ canvas.addEventListener("pointerdown", async (event) => {
       if (!buildSpeechSentence(entry)) {
         return false;
       }
-      return x >= entry.x && x <= entry.x + entry.w && y >= entry.y && y <= entry.y + entry.h;
+      const imageX = (x - imageOffsetX) / imageScale;
+      const imageY = (y - imageOffsetY) / imageScale;
+      return imageX >= entry.x && imageX <= entry.x + entry.w && imageY >= entry.y && imageY <= entry.y + entry.h;
     });
   if (object) {
     reading = true;

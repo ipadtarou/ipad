@@ -5,19 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Picture Touch Viewer</title>
     <style>
+      html,
       body {
         margin: 0;
+        min-height: 100%;
+      }
+      body {
         font-family: "Segoe UI", "Noto Sans JP", sans-serif;
         background: #f5f7fb;
         color: #111827;
       }
       .container {
-        max-width: 1100px;
+        width: 100%;
+        min-height: 100vh;
+        box-sizing: border-box;
         margin: 0 auto;
-        padding: 20px;
+        padding: 12px;
       }
       .toolbar {
         display: flex;
+        flex-wrap: wrap;
         gap: 8px;
         margin-bottom: 12px;
       }
@@ -32,25 +39,30 @@
         display: grid;
         grid-template-columns: 1fr 320px;
         gap: 16px;
+        height: calc(100vh - 100px);
       }
       .canvas-area {
         background: white;
         border-radius: 12px;
-        padding: 16px;
+        padding: 8px;
         border: 1px solid #e5e7eb;
+        min-height: 360px;
+        height: 100%;
       }
       canvas {
         display: block;
         border: 1px solid #cbd5e1;
         background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
         width: 100%;
-        max-width: 100%;
+        height: 100%;
       }
       .panel {
         background: white;
         border-radius: 12px;
         padding: 16px;
         border: 1px solid #e5e7eb;
+        overflow: auto;
+        height: 100%;
       }
       .message {
         min-height: 120px;
@@ -62,6 +74,11 @@
       @media (max-width: 900px) {
         .viewer-shell {
           grid-template-columns: 1fr;
+          height: auto;
+        }
+        .canvas-area,
+        .panel {
+          height: auto;
         }
       }
     </style>
@@ -71,13 +88,6 @@
       <div class="toolbar">
         <button id="start-read">読む</button>
         <button id="stop-read">止める</button>
-        <select id="zoom-select">
-          <option value="1">100%</option>
-          <option value="1.5">150%</option>
-          <option value="2">200%</option>
-          <option value="3">300%</option>
-        </select>
-        <select id="voice-select"></select>
       </div>
       <div class="viewer-shell">
         <div class="canvas-area">
