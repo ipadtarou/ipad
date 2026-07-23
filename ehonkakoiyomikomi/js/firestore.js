@@ -6,6 +6,10 @@ function getStorageKey(imageId) {
   return `${STORAGE_PREFIX}:${imageId}`;
 }
 
+function generateUniqueId(prefix = "obj") {
+  return window.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function readStoredObjects(imageId) {
   const raw = window.localStorage.getItem(getStorageKey(imageId));
   if (!raw) {
@@ -58,7 +62,7 @@ async function saveToFirestore(imageId, objects) {
     console.info("saveToFirestore existing ids", existingIds);
 
     for (const object of objects) {
-      const docId = object.id || `${imageId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const docId = object.id || generateUniqueId(imageId);
       const normalized = { ...object, id: docId, image: imageId };
       await setDoc(doc(context.db, "objects", docId), normalized);
       console.info("saveToFirestore wrote", docId, normalized);
@@ -93,7 +97,7 @@ export async function loadObjects(imageId) {
 
   const initialObjects = [
     {
-      id: "obj-demo-01",
+      id: generateUniqueId("obj"),
       image: "01",
       name: "犬",
       x: 140,

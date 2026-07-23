@@ -1,5 +1,9 @@
 import { getSpeechVoices, resolveVoice } from "./voice.js";
 
+function createUniqueObjectId() {
+  return window.crypto?.randomUUID?.() ?? `obj-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export class EditorController {
   constructor({ canvasController, uiController, firestore, onChange }) {
     this.canvasController = canvasController;
@@ -55,10 +59,11 @@ export class EditorController {
       y: current?.y ?? 0,
       w: current?.w ?? 80,
       h: current?.h ?? 60,
+      order: Number(formValues.order || 1),
     };
 
     if (!nextObject.id) {
-      nextObject.id = `obj-${Date.now()}`;
+      nextObject.id = createUniqueObjectId();
       this.objects.push(nextObject);
     } else {
       const index = this.objects.findIndex((entry) => entry.id === nextObject.id);
@@ -67,6 +72,7 @@ export class EditorController {
       }
     }
 
+    this.objects = this.objects.slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
     this.selectedObject = nextObject;
     this.canvasController.setObjects(this.objects);
     const saveResult = await this.firestore.saveObject(this.imageId, nextObject);

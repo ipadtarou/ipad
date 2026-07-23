@@ -1,3 +1,7 @@
+function createUniqueObjectId() {
+  return window.crypto?.randomUUID?.() ?? `obj-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export class CanvasController {
   constructor(canvas, options = {}) {
     this.canvas = canvas;
@@ -228,7 +232,7 @@ export class CanvasController {
       const preview = this.getPreviewRect();
       if (preview && preview.w > 4 && preview.h > 4) {
         const rectObject = {
-          id: `obj-${Date.now()}`,
+          id: createUniqueObjectId(),
           image: this.options.imageId || "01",
           name: "",
           x: preview.x,

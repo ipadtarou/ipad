@@ -155,7 +155,7 @@ async function loadImage(imageId) {
   imageObj.src = `./${imageId}.jpg`;
   await imageObj.decode().catch(() => undefined);
   image = imageObj;
-  objects = await loadObjects(imageId);
+  objects = (await loadObjects(imageId)).slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
   render();
 }
 
@@ -208,6 +208,9 @@ canvas.addEventListener("pointerdown", async (event) => {
     .reverse()
     .find((entry) => {
       if (!entry.visible) {
+        return false;
+      }
+      if (!buildSpeechSentence(entry)) {
         return false;
       }
       return x >= entry.x && x <= entry.x + entry.w && y >= entry.y && y <= entry.y + entry.h;
