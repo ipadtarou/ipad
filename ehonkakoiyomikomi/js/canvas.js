@@ -124,22 +124,23 @@ export class CanvasController {
     }
 
     const { x, y, w, h } = rect;
+    const isTransparent = color === "transparent";
     this.ctx.save();
     if (isSelected) {
       const pulse = Math.sin(this.highlightPulse) * 4 + 6;
-      this.ctx.fillStyle = "rgba(37, 99, 235, 0.12)";
+      this.ctx.fillStyle = isTransparent ? "rgba(255, 255, 255, 0.12)" : "rgba(37, 99, 235, 0.12)";
       this.ctx.fillRect((x - pulse) * this.zoom, (y - pulse) * this.zoom, (w + pulse * 2) * this.zoom, (h + pulse * 2) * this.zoom);
-      this.ctx.strokeStyle = "#2563eb";
+      this.ctx.strokeStyle = isTransparent ? "#ffffff" : "#2563eb";
       this.ctx.lineWidth = 3;
-      this.ctx.setLineDash([7, 4]);
+      this.ctx.setLineDash(isTransparent ? [6, 4] : [7, 4]);
       this.ctx.strokeRect((x - pulse) * this.zoom, (y - pulse) * this.zoom, (w + pulse * 2) * this.zoom, (h + pulse * 2) * this.zoom);
       this.ctx.restore();
       return;
     }
 
-    this.ctx.strokeStyle = color;
+    this.ctx.strokeStyle = isTransparent ? "rgba(255, 255, 255, 0.85)" : color;
     this.ctx.lineWidth = 2;
-    this.ctx.setLineDash([]);
+    this.ctx.setLineDash(isTransparent ? [6, 4] : []);
     this.ctx.strokeRect(x * this.zoom, y * this.zoom, w * this.zoom, h * this.zoom);
     this.ctx.restore();
   }
@@ -241,7 +242,7 @@ export class CanvasController {
           h: preview.h,
           text: "",
           voice: "",
-          color: "#00ff00",
+          color: "#9df59c",
           order: 1,
           visible: true,
         };

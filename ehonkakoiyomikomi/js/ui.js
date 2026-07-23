@@ -21,11 +21,13 @@ export class UIController {
   }
 
   fillForm(object) {
+    const isTransparent = object.color === "transparent";
     this.form.objectId.value = object.id || "";
     this.form.name.value = object.name || "";
     this.form.text.value = object.text || "";
     this.form.voice.value = object.voice || "";
-    this.form.color.value = object.color || "#00ff00";
+    this.form.color.value = isTransparent ? "#9df59c" : object.color || "#9df59c";
+    this.form.transparent.classList.toggle("active", isTransparent);
     this.form.visible.checked = object.visible !== false;
     this.form.order.value = object.order || 1;
   }
@@ -36,7 +38,7 @@ export class UIController {
       name: this.form.name.value,
       text: this.form.text.value,
       voice: this.form.voice.value,
-      color: this.form.color.value,
+      color: this.form.transparent.classList.contains("active") ? "transparent" : this.form.color.value,
       visible: this.form.visible.checked,
       order: Number(this.form.order.value || 1),
     };
@@ -54,6 +56,16 @@ export class UIController {
     document.getElementById("close-panel").addEventListener("click", onClose);
     document.getElementById("zoom-select").addEventListener("change", (event) => {
       onZoomChange?.(Number(event.target.value));
+    });
+    this.form.transparent.addEventListener("click", () => {
+      const isActive = !this.form.transparent.classList.contains("active");
+      this.form.transparent.classList.toggle("active", isActive);
+      if (isActive) {
+        this.form.color.value = "#9df59c";
+      }
+    });
+    this.form.color.addEventListener("input", () => {
+      this.form.transparent.classList.remove("active");
     });
   }
 }

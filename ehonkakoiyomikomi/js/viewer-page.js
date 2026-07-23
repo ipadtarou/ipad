@@ -53,6 +53,7 @@ function render() {
       continue;
     }
     const isActive = object.id === lastSpokenObjectId;
+    const isTransparent = object.color === "transparent";
     ctx.save();
     const x = object.x * imageScale + imageOffsetX;
     const y = object.y * imageScale + imageOffsetY;
@@ -60,16 +61,16 @@ function render() {
     const h = object.h * imageScale;
     if (isActive) {
       const pulse = Math.sin(highlightPulse) * 4 + 6;
-      ctx.fillStyle = "rgba(37, 99, 235, 0.12)";
+      ctx.fillStyle = isTransparent ? "rgba(255, 255, 255, 0.18)" : "rgba(37, 99, 235, 0.12)";
       ctx.fillRect(x - pulse, y - pulse, w + pulse * 2, h + pulse * 2);
-      ctx.strokeStyle = "#2563eb";
+      ctx.strokeStyle = isTransparent ? "#ffffff" : "#2563eb";
       ctx.lineWidth = 4;
       ctx.setLineDash([8, 4]);
       ctx.strokeRect(x - pulse, y - pulse, w + pulse * 2, h + pulse * 2);
     } else {
-      ctx.strokeStyle = object.color || "#00ff00";
+      ctx.strokeStyle = isTransparent ? "rgba(255, 255, 255, 0.85)" : object.color || "#9df59c";
       ctx.lineWidth = 2;
-      ctx.setLineDash([]);
+      ctx.setLineDash(isTransparent ? [6, 4] : []);
       ctx.strokeRect(x, y, w, h);
     }
     ctx.restore();
