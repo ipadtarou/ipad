@@ -10,6 +10,8 @@ let objects = [];
 let imageScale = 1;
 let imageOffsetX = 0;
 let imageOffsetY = 0;
+let currentIndex = 0;
+let reading = false;
 let lastSpokenObjectId = null;
 let highlightPulse = 0;
 let highlightTimer = null;
@@ -109,6 +111,7 @@ async function speakObject(object, { autoContinue = false } = {}) {
     }
     return;
   }
+  reading = true;
   playbackToken += 1;
   const token = playbackToken;
   const selectedVoice = resolveVoice(object.voice || null, voices);
@@ -168,19 +171,9 @@ async function bootstrap() {
   voices = await getSpeechVoices();
   resizeCanvas();
   await loadImage("01");
-  if (voices.length > 0) {
-    const utterance = new SpeechSynthesisUtterance("音声読み上げの準備ができました。");
-    utterance.lang = "ja-JP";
-    utterance.volume = 0;
-    window.speechSynthesis.speak(utterance);
-    utterance.onend = () => {
-      window.speechSynthesis.cancel();
-    };
-  }
 }
 
-canvas.addEventListener("pointerdown", async (event) => {
-  event.preventDefault();
+canvas.addEventListener("click", async (event) => {
   const rect = canvas.getBoundingClientRect();
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
