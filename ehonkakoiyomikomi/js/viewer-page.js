@@ -4,7 +4,12 @@ import { getSpeechVoices, resolveVoice } from "./voice.js";
 
 const canvas = document.getElementById("viewer-canvas");
 const ctx = canvas.getContext("2d");
+const prevPageButton = document.getElementById("prev-page");
+const nextPageButton = document.getElementById("next-page");
+const pageIndicator = document.getElementById("page-indicator");
 
+const imageIds = ["01"];
+let currentPageIndex = 0;
 let image = null;
 let objects = [];
 let imageScale = 1;
@@ -161,8 +166,25 @@ async function loadImage(imageId) {
   image = imageObj;
   objects = (await loadObjects(imageId)).slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
   render();
+  updatePageIndicator();
 }
 
+function updatePageIndicator() {
+  pageIndicator.textContent = `${imageIds[currentPageIndex]} (${currentPageIndex + 1}/${imageIds.length})`;
+  prevPageButton.disabled = currentPageIndex === 0;
+  nextPageButton.disabled = currentPageIndex === imageIds.length - 1;
+}
+
+function goToPage(index) {
+  if (index < 0 || index >= imageIds.length) {
+    return;
+  }
+  currentPageIndex = index;
+  currentIndex = 0;
+  lastSpokenObjectId = null;
+  stopHighlight();
+  loadImage(imageIds[currentPageIndex]);
+}
 
 window.addEventListener("resize", resizeCanvas);
 
@@ -170,7 +192,7 @@ async function bootstrap() {
   await initializeFirebase();
   voices = await getSpeechVoices();
   resizeCanvas();
-  await loadImage("01");
+  await loadImage(imageIds[currentPageIndex]);
 }
 
 canvas.addEventListener("click", async (event) => {
@@ -198,5 +220,8 @@ canvas.addEventListener("click", async (event) => {
     await speakObject(object, { autoContinue: false });
   }
 });
+
+prevPageButton.addEventListener("click", () => goToPage(currentPageIndex - 1));
+nextPageButton.addEventListener("click", () => goToPage(currentPageIndex + 1));
 
 bootstrap();
