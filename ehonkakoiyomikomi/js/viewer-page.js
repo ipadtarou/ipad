@@ -20,6 +20,7 @@ let lastSpokenObjectId = null;
 let highlightPulse = 0;
 let highlightTimer = null;
 let playbackToken = 0;
+let voices = [];
 
 function resizeCanvas() {
   const width = Math.max(700, window.innerWidth * 0.6);
@@ -107,7 +108,6 @@ async function speakObject(object, { autoContinue = false } = {}) {
   playbackToken += 1;
   const token = playbackToken;
   currentLabel.textContent = sentence;
-  const voices = await getSpeechVoices();
   const selectedVoice = resolveVoice(object.voice || voiceSelect?.value, voices);
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(sentence);
@@ -183,10 +183,19 @@ window.addEventListener("resize", resizeCanvas);
 
 async function bootstrap() {
   await initializeFirebase();
-  const voices = await getSpeechVoices();
+  voices = await getSpeechVoices();
   populateVoiceSelect(voiceSelect, voices, "");
   resizeCanvas();
   await loadImage("01");
+  if (voices.length > 0) {
+    const utterance = new SpeechSynthesisUtterance("音声読み上げの準備ができました。");
+    utterance.lang = "ja-JP";
+    utterance.volume = 0;
+    window.speechSynthesis.speak(utterance);
+    utterance.onend = () => {
+      window.speechSynthesis.cancel();
+    };
+  }
 }
 
 canvas.addEventListener("pointerdown", async (event) => {
@@ -194,14 +203,19 @@ canvas.addEventListener("pointerdown", async (event) => {
   const rect = canvas.getBoundingClientRect();
   const x = (event.clientX - rect.left) / zoom;
   const y = (event.clientY - rect.top) / zoom;
-  const object = objects.find((entry) => {
-    if (!entry.visible) {
-      return false;
-    }
-    return x >= entry.x && x <= entry.x + entry.w && y >= entry.y && y <= entry.y + entry.h;
-  });
+  const object = objects
+    .slice()
+    .reverse()
+    .find((entry) => {
+      if (!entry.visible) {
+        return false;
+      }
+      return x >= entry.x && x <= entry.x + entry.w && y >= entry.y && y <= entry.y + entry.h;
+    });
   if (object) {
     reading = true;
+    lastSpokenObjectId = object.id;
+    startHighlight();
     await speakObject(object, { autoContinue: false });
   }
 });
