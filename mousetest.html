@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>左クリック動作確認</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Yu Gothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #f4f7ff, #dbeafe);
+      color: #0f172a;
+    }
+
+    .wrap {
+      text-align: center;
+      padding: 24px;
+    }
+
+    .main-button {
+      width: min(80vw, 320px);
+      height: 160px;
+      border: none;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      font-size: 28px;
+      font-weight: 700;
+      box-shadow: 0 16px 30px rgba(37, 99, 235, 0.28);
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      user-select: none;
+    }
+
+    .main-button:active {
+      transform: scale(0.97);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.24);
+    }
+
+    .status-message {
+      margin-top: 24px;
+      min-height: 48px;
+      font-size: 34px;
+      font-weight: 900;
+      color: #dc2626;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+
+    .status-message.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <button id="checkButton" class="main-button" type="button">左クリック動作確認</button>
+    <div id="statusMessage" class="status-message" aria-live="polite"></div>
+  </div>
+
+  <script>
+    const button = document.getElementById('checkButton');
+    const statusMessage = document.getElementById('statusMessage');
+    let hideTimer = null;
+
+    function playSuccessSound() {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+
+      const context = new AudioContext();
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      gainNode.gain.value = 0.12;
+
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+
+      oscillator.start();
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.25);
+      oscillator.stop(context.currentTime + 0.25);
+
+      setTimeout(() => context.close(), 300);
+    }
+
+    button.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+      playSuccessSound();
+
+      statusMessage.textContent = 'スイッチが押されました、成功です！！';
+      statusMessage.classList.add('show');
+
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        statusMessage.textContent = '';
+        statusMessage.classList.remove('show');
+      }, 2000);
+    });
+  </script>
+</body>
+</html>

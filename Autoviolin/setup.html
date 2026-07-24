@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Autoviolin 設定</title>
+  <style>
+    :root {
+      --bg: #13273f;
+      --panel: #1d3557;
+      --panel-2: #213d63;
+      --accent: #f8d97e;
+      --accent-2: #71f3ff;
+      --text: #f8fbff;
+      --muted: #c4d6ea;
+      --danger: #ff7a7a;
+      --ok: #7ef0b4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Yu Gothic", "Meiryo", sans-serif;
+      background: linear-gradient(180deg, #13273f, #0a1626);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 18px;
+    }
+    .shell {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+    .panel {
+      background: rgba(16, 33, 58, 0.94);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+    }
+    h1 { margin: 0 0 8px 0; font-size: 1.6rem; }
+    .sub { color: var(--muted); margin-bottom: 10px; }
+    .mode-switch {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .mode-btn, .save-btn, .goto-btn {
+      touch-action: manipulation;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      color: #10223b;
+      background: var(--accent);
+      font-weight: 700;
+    }
+    .mode-btn.active { background: var(--accent-2); }
+    .pill-btn {
+      background: #dce7f6;
+      color: #10223b;
+      min-width: 100px;
+    }
+    .save-btn { background: var(--ok); }
+    .goto-btn { background: #fff; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr;
+      gap: 16px;
+    }
+    .note-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      align-items: stretch;
+    }
+    .note-tile {
+      min-height: 72px;
+      border-radius: 14px;
+      border: 2px solid rgba(255,255,255,0.14);
+      background: linear-gradient(180deg, #294c79, #1b385d);
+      color: var(--text);
+      font-size: 0.96rem;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+      transition: transform 0.12s ease, background 0.12s ease;
+      user-select: none;
+      touch-action: manipulation;
+      padding: 6px;
+      line-height: 1.2;
+    }
+    .note-tile small {
+      display: block;
+      font-size: 0.9rem;
+      opacity: 0.95;
+      font-weight: 700;
+    }
+    .note-tile:active { transform: scale(0.96); }
+    .note-tile.selected { background: linear-gradient(180deg, #82e3ff, #38bbd7); color: #08324a; }
+    .staff {
+      display: grid;
+      gap: 12px;
+      padding: 12px;
+      background: #10233b;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      min-height: 420px;
+      position: relative;
+      overflow: hidden;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    .staff-lines {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      position: absolute;
+      inset: 14px 12px;
+      pointer-events: none;
+    }
+    .staff-line {
+      height: 2px;
+      background: rgba(255,255,255,0.62);
+      margin: 0;
+      position: relative;
+    }
+    .staff-line:nth-child(odd)::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 10px;
+      height: 2px;
+      background: rgba(255,255,255,0.12);
+    }
+    .staff-hint {
+      position: absolute;
+      left: 14px;
+      bottom: 12px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      background: rgba(0,0,0,0.25);
+      padding: 6px 10px;
+      border-radius: 999px;
+    }
+    .preview-dot {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 3px solid #fff;
+      background: rgba(113, 243, 255, 0.35);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      display: none;
+    }
+    .preview-label {
+      position: absolute;
+      left: 46px;
+      top: 18px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 0.88rem;
+      pointer-events: none;
+      display: none;
+    }
+    .staff-note.selected { background: linear-gradient(180deg, #93f5ff, #67dfff); color: #08324a; }
+    .selected-list {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-height: 86px;
+      align-content: flex-start;
+    }
+    .selected-chip {
+      background: #e6f5ff;
+      color: #0d2744;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 700;
+      min-width: 62px;
+      text-align: center;
+    }
+    .status {
+      min-height: 26px;
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    .save-area {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .saved-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .saved-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .saved-item-title {
+      font-weight: 700;
+      color: var(--text);
+    }
+    .saved-item-sub {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .delete-btn {
+      background: #ffb0b0;
+      color: #5a1328;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    input[type="text"] {
+      flex: 1 1 260px;
+      min-width: 220px;
+      padding: 12px 14px;
+      font-size: 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: #f4f8ff;
+      color: #0d2744;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .note-tile { min-width: 88px; min-height: 88px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="panel">
+      <h1>Autoviolin 設定</h1>
+      <div class="sub">G3 → G5 の 25 音から、押した順に音を選んで保存できます。押すと下の順番欄へ移動して視覚的に確認できます。</div>
+      <div class="mode-switch">
+        <button type="button" class="mode-btn active" data-mode="sequence">音階を並べる方式</button>
+      </div>
+      <div class="status" id="statusLine">音を押すと、その音をその場で再生します。</div>
+    </div>
+
+    <div class="layout">
+      <div class="panel">
+        <div id="sequenceMode" class="mode-area">
+          <div class="note-grid" id="noteStrip"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="sub">選ばれた順番</div>
+        <div class="selected-list" id="selectedList"></div>
+        <div class="save-area" style="margin-top:12px;">
+          <input id="songName" type="text" placeholder="曲名を入力" />
+          <button class="save-btn" id="saveSong">曲名を付けて保存</button>
+        </div>
+        <div class="save-area" style="margin-top:12px;">
+          <a href="play.html" class="goto-btn" style="text-decoration:none; display:inline-block;">演奏ページへ</a>
+        </div>
+        <div class="sub" style="margin-top:14px;">保存済み曲一覧</div>
+        <div class="saved-list" id="savedSongList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const NOTE_ORDER = [
+      'G3', 'Gs3', 'A3', 'As3', 'B3', 'C4', 'Cs4', 'D4', 'Ds4', 'E4', 'F4', 'Fs4', 'G4', 'Gs4', 'A4', 'As4', 'B4', 'C5', 'Cs5', 'D5', 'Ds5', 'E5', 'F5', 'Fs5', 'G5'
+    ];
+
+    const NOTE_JP = {
+      G3: 'ソ', Gs3: 'ソ♯', A3: 'ラ', As3: 'ラ♯', B3: 'シ',
+      C4: 'ド', Cs4: 'ド♯', D4: 'レ', Ds4: 'レ♯', E4: 'ミ',
+      F4: 'ファ', Fs4: 'ファ♯', G4: 'ソ', Gs4: 'ソ♯', A4: 'ラ',
+      As4: 'ラ♯', B4: 'シ', C5: 'ド', Cs5: 'ド♯', D5: 'レ',
+      Ds5: 'レ♯', E5: 'ミ', F5: 'ファ', Fs5: 'ファ♯', G5: 'ソ'
+    };
+
+    const NOTE_FILES = {
+      G3: 'violin_G3_15_forte_arco-normal.mp3',
+      Gs3: 'violin_Gs3_15_mezzo-forte_arco-normal.mp3',
+      A3: 'violin_A3_15_forte_arco-normal.mp3',
+      As3: 'violin_As3_1_mezzo-forte_arco-normal.mp3',
+      B3: 'violin_B3_15_forte_arco-normal.mp3',
+      C4: 'violin_C4_15_forte_arco-normal.mp3',
+      Cs4: 'violin_Cs4_1_mezzo-forte_arco-normal.mp3',
+      D4: 'violin_D4_15_forte_arco-normal.mp3',
+      Ds4: 'violin_Ds4_15_forte_arco-normal.mp3',
+      E4: 'violin_E4_1_mezzo-forte_arco-normal.mp3',
+      F4: 'violin_F4_1_forte_arco-normal.mp3',
+      Fs4: 'violin_Fs4_15_forte_arco-normal.mp3',
+      G4: 'violin_G4_15_mezzo-forte_arco-normal.mp3',
+      Gs4: 'violin_Gs4_15_forte_arco-normal.mp3',
+      A4: 'violin_A4_05_forte_arco-normal.mp3',
+      As4: 'violin_As4_15_forte_arco-normal.mp3',
+      B4: 'violin_B4_15_forte_arco-normal.mp3',
+      C5: 'violin_C5_1_mezzo-forte_arco-normal.mp3',
+      Cs5: 'violin_Cs5_1_forte_arco-normal.mp3',
+      D5: 'violin_D5_15_forte_arco-normal.mp3',
+      Ds5: 'violin_Ds5_15_forte_arco-normal.mp3',
+      E5: 'violin_E5_15_forte_arco-normal.mp3',
+      F5: 'violin_F5_1_forte_arco-normal.mp3',
+      Fs5: 'violin_Fs5_15_forte_arco-normal.mp3',
+      G5: 'violin_G5_15_forte_arco-normal.mp3'
+    };
+
+    const noteStrip = document.getElementById('noteStrip');
+    const selectedList = document.getElementById('selectedList');
+    const savedSongList = document.getElementById('savedSongList');
+    const statusLine = document.getElementById('statusLine');
+    const songNameInput = document.getElementById('songName');
+    const saveSongBtn = document.getElementById('saveSong');
+    const sequenceMode = document.getElementById('sequenceMode');
+
+    const state = {
+      mode: 'sequence',
+      sequence: [],
+      db: null,
+      songs: []
+    };
+
+    const firebaseConfig = {
+      apiKey: 'REPLACE_WITH_API_KEY',
+      authDomain: 'autoviolin.firebaseapp.com',
+      projectId: 'autoviolin',
+      storageBucket: 'autoviolin.appspot.com',
+      messagingSenderId: '269061883781',
+      appId: 'REPLACE_WITH_APP_ID'
+    };
+
+    const audioCache = new Map();
+
+    const displayNote = (note) => note.replace('Gs', 'G#').replace('As', 'A#').replace('Cs', 'C#').replace('Ds', 'D#').replace('Fs', 'F#');
+    const readableKey = (note) => displayNote(note);
+
+    function preloadAllAudios() {
+      NOTE_ORDER.forEach((note) => {
+        if (!audioCache.has(note)) {
+          const audio = new Audio(`./${NOTE_FILES[note]}`);
+          audio.preload = 'auto';
+          audio.volume = 1;
+          audio.load();
+          audioCache.set(note, audio);
+        }
+      });
+      statusLine.textContent = '25 音の音源を事前読み込みしました。';
+    }
+
+    function getAudio(note) {
+      if (!audioCache.has(note)) {
+        const audio = new Audio(`./${NOTE_FILES[note]}`);
+        audio.preload = 'auto';
+        audio.volume = 1;
+        audioCache.set(note, audio);
+      }
+      return audioCache.get(note);
+    }
+
+    function previewNote(note) {
+      const audio = getAudio(note).cloneNode();
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+
+    function appendNote(note) {
+      state.sequence.push(note);
+      renderSelectedList();
+      previewNote(note);
+      statusLine.textContent = `${readableKey(note)} を追加しました。${state.sequence.length} 音の順番です。`;
+    }
+
+    function renderSelectedList() {
+      selectedList.innerHTML = '';
+      state.sequence.forEach((note) => {
+        const chip = document.createElement('div');
+        chip.className = 'selected-chip';
+        chip.textContent = readableKey(note);
+        selectedList.appendChild(chip);
+      });
+    }
+
+    function renderSequenceMode() {
+      noteStrip.innerHTML = '';
+      NOTE_ORDER.forEach((note) => {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'note-tile';
+        tile.innerHTML = `<span>${readableKey(note)}</span><small>${NOTE_JP[note]}</small>`;
+        tile.addEventListener('click', () => appendNote(note));
+        noteStrip.appendChild(tile);
+      });
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      document.querySelectorAll('.mode-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+      sequenceMode.style.display = mode === 'sequence' ? 'block' : 'none';
+    }
+
+    document.querySelectorAll('.mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    });
+
+    function loadLocalSongs() {
+      try {
+        return JSON.parse(localStorage.getItem('autoviolin_local_songs') || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function localSaveSong(songTitle, notes) {
+      const key = 'autoviolin_local_songs';
+      const current = JSON.parse(localStorage.getItem(key) || '[]');
+      current.unshift({ title: songTitle, notes, createdAt: new Date().toISOString() });
+      localStorage.setItem(key, JSON.stringify(current));
+      statusLine.textContent = `ローカル保存しました: ${songTitle}`;
+    }
+
+    async function saveSong() {
+      const title = songNameInput.value.trim() || `Autoviolin_${new Date().toLocaleTimeString()}`;
+      if (!state.sequence.length) {
+        statusLine.textContent = '音を一つ以上選んでください。';
+        return;
+      }
+
+      if (state.db) {
+        try {
+          await addDoc(collection(state.db, 'songs'), {
+            title,
+            notes: state.sequence,
+            createdAt: serverTimestamp()
+          });
+          statusLine.textContent = `Firestore に保存しました: ${title}`;
+          await loadSavedSongs();
+        } catch (error) {
+          statusLine.textContent = `Firestore 保存に失敗したためローカル保存へ切り替えました: ${error.message}`;
+          localSaveSong(title, state.sequence);
+          await loadSavedSongs();
+        }
+      } else {
+        localSaveSong(title, state.sequence);
+        await loadSavedSongs();
+      }
+    }
+
+    function renderSavedSongs() {
+      savedSongList.innerHTML = '';
+      if (!state.songs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'saved-item';
+        empty.innerHTML = '<div class="saved-item-title">保存済み曲はありません</div>';
+        savedSongList.appendChild(empty);
+        return;
+      }
+
+      state.songs.forEach((song) => {
+        const item = document.createElement('div');
+        item.className = 'saved-item';
+        item.innerHTML = `
+          <div>
+            <div class="saved-item-title">${song.title}</div>
+            <div class="saved-item-sub">${song.source} · ${song.notes.length}音</div>
+          </div>
+        `;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = '削除';
+        deleteBtn.addEventListener('click', async () => {
+          try {
+            if (song.source === 'firestore' && song.docId && state.db) {
+              await deleteDoc(doc(state.db, 'songs', song.docId));
+              statusLine.textContent = `Firestore から削除しました: ${song.title}`;
+            } else {
+              const current = loadLocalSongs();
+              const next = current.filter((entry) => !(entry.title === song.title && entry.createdAt === song.createdAt));
+              localStorage.setItem('autoviolin_local_songs', JSON.stringify(next));
+              statusLine.textContent = `ローカル保存から削除しました: ${song.title}`;
+            }
+          } catch (error) {
+            statusLine.textContent = `削除失敗: ${song.title} (${error.message})`;
+          }
+          await loadSavedSongs();
+        });
+
+        item.appendChild(deleteBtn);
+        savedSongList.appendChild(item);
+      });
+    }
+
+    async function loadSavedSongs() {
+      const localSongs = loadLocalSongs().map((song) => ({ ...song, source: 'local' }));
+      const firestoreSongs = [];
+
+      if (state.db) {
+        try {
+          const q = query(collection(state.db, 'songs'), orderBy('createdAt', 'desc'));
+          const result = await getDocs(q);
+          result.forEach((docSnap) => {
+            const data = docSnap.data();
+            firestoreSongs.push({
+              title: data.title || 'Untitled',
+              notes: data.notes || [],
+              createdAt: data.createdAt?.toDate?.() ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+              source: 'firestore',
+              docId: docSnap.id
+            });
+          });
+        } catch (error) {
+          statusLine.textContent = 'Firestore 読み込みに失敗したため、ローカル保存済み曲のみ表示します。';
+        }
+      }
+
+      state.songs = [...firestoreSongs, ...localSongs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      renderSavedSongs();
+    }
+
+    async function initFirebase() {
+      try {
+        const app = initializeApp(firebaseConfig);
+        state.db = getFirestore(app);
+        statusLine.textContent = 'Firestore 接続を準備しました。';
+      } catch (error) {
+        statusLine.textContent = 'Firebase の設定がまだ未完成のため、ローカル保存モードで動作します。';
+      }
+    }
+
+    preloadAllAudios();
+    renderSequenceMode();
+    renderSelectedList();
+    initFirebase().then(() => loadSavedSongs());
+    saveSongBtn.addEventListener('click', saveSong);
+  </script>
+</body>
+</html>

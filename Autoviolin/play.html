@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Autoviolin 演奏</title>
+  <style>
+    :root {
+      --bg: #0f1b32;
+      --panel: #132746;
+      --accent: #f7db82;
+      --accent-2: #7aeaff;
+      --text: #ffffff;
+      --muted: #c6d7ef;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, "Yu Gothic", "Meiryo", sans-serif;
+      background: radial-gradient(circle at top, #17355e, #0b1424);
+      color: var(--text);
+      padding: 18px;
+    }
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+    .panel {
+      border-radius: 18px;
+      background: rgba(15, 25, 49, 0.94);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 16px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    select, button {
+      font-size: 1rem;
+      border-radius: 12px;
+      border: none;
+      padding: 12px 14px;
+      touch-action: manipulation;
+    }
+    select {
+      min-width: 260px;
+      background: #f6faff;
+      color: #173559;
+    }
+    button {
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #10243a;
+    }
+    .stage {
+      position: relative;
+      min-height: calc(100vh - 130px);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border-radius: 20px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+      outline: none;
+      cursor: pointer;
+    }
+    .stage::after {
+      content: "";
+      position: absolute;
+      inset: 20px;
+      border-radius: 18px;
+      pointer-events: none;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 0 32px rgba(122, 234, 255, 0.15);
+    }
+    .violin-wrap {
+      width: min(92vw, 620px);
+      max-width: 100%;
+      display: grid;
+      place-items: center;
+      transition: filter 0.12s ease, transform 0.12s ease;
+      cursor: pointer;
+      pointer-events: none;
+      position: relative;
+      z-index: 1;
+    }
+    .violin-wrap.active {
+      filter: drop-shadow(0 0 20px rgba(122, 234, 255, 0.72)) brightness(1.08);
+    }
+    .violin-wrap img {
+      width: 100%;
+      height: auto;
+      user-select: none;
+      pointer-events: none;
+      filter: drop-shadow(0 8px 20px rgba(0,0,0,0.5));
+    }
+    .hud {
+      color: var(--muted);
+      font-size: 0.98rem;
+      min-height: 26px;
+    }
+    .hide { display: none; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="panel">
+      <div class="row">
+        <label for="songSelect" style="font-weight:700;">保存済み曲</label>
+        <select id="songSelect"></select>
+        <a href="setup.html" style="text-decoration:none;"><button type="button">設定へ</button></a>
+      </div>
+      <div class="hud" id="hud">画面を押した瞬間に次の音を再生し、離すと音が減衰します。</div>
+    </div>
+
+    <div class="panel stage" id="playArea" tabindex="0">
+      <div class="violin-wrap" id="violinWrap">
+        <img src="./violin.jpg" alt="violin" />
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getFirestore, collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const NOTE_FILES = {
+      G3: 'violin_G3_15_forte_arco-normal.mp3',
+      Gs3: 'violin_Gs3_15_mezzo-forte_arco-normal.mp3',
+      A3: 'violin_A3_15_forte_arco-normal.mp3',
+      As3: 'violin_As3_1_mezzo-forte_arco-normal.mp3',
+      B3: 'violin_B3_15_forte_arco-normal.mp3',
+      C4: 'violin_C4_15_forte_arco-normal.mp3',
+      Cs4: 'violin_Cs4_1_mezzo-forte_arco-normal.mp3',
+      D4: 'violin_D4_15_forte_arco-normal.mp3',
+      Ds4: 'violin_Ds4_15_forte_arco-normal.mp3',
+      E4: 'violin_E4_1_mezzo-forte_arco-normal.mp3',
+      F4: 'violin_F4_1_forte_arco-normal.mp3',
+      Fs4: 'violin_Fs4_15_forte_arco-normal.mp3',
+      G4: 'violin_G4_15_mezzo-forte_arco-normal.mp3',
+      Gs4: 'violin_Gs4_15_forte_arco-normal.mp3',
+      A4: 'violin_A4_05_forte_arco-normal.mp3',
+      As4: 'violin_As4_15_forte_arco-normal.mp3',
+      B4: 'violin_B4_15_forte_arco-normal.mp3',
+      C5: 'violin_C5_1_mezzo-forte_arco-normal.mp3',
+      Cs5: 'violin_Cs5_1_forte_arco-normal.mp3',
+      D5: 'violin_D5_15_forte_arco-normal.mp3',
+      Ds5: 'violin_Ds5_15_forte_arco-normal.mp3',
+      E5: 'violin_E5_15_forte_arco-normal.mp3',
+      F5: 'violin_F5_1_forte_arco-normal.mp3',
+      Fs5: 'violin_Fs5_15_forte_arco-normal.mp3',
+      G5: 'violin_G5_15_forte_arco-normal.mp3'
+    };
+
+    const songSelect = document.getElementById('songSelect');
+    const playArea = document.getElementById('playArea');
+    const violinWrap = document.getElementById('violinWrap');
+    const hud = document.getElementById('hud');
+
+    const state = {
+      songs: [],
+      db: null,
+      currentSong: null,
+      index: 0,
+      activeAudios: [],
+      activePointerId: null,
+      audioCache: new Map(),
+      fadeInterval: null
+    };
+
+    const firebaseConfig = {
+      apiKey: 'REPLACE_WITH_API_KEY',
+      authDomain: 'autoviolin.firebaseapp.com',
+      projectId: 'autoviolin',
+      storageBucket: 'autoviolin.appspot.com',
+      messagingSenderId: '269061883781',
+      appId: 'REPLACE_WITH_APP_ID'
+    };
+
+    const displayNote = (note) => note.replace('Gs', 'G#').replace('As', 'A#').replace('Cs', 'C#').replace('Ds', 'D#').replace('Fs', 'F#');
+
+    function loadLocalSongs() {
+      const local = JSON.parse(localStorage.getItem('autoviolin_local_songs') || '[]');
+      return local;
+    }
+
+    async function initFirebase() {
+      try {
+        const app = initializeApp(firebaseConfig);
+        state.db = getFirestore(app);
+      } catch (error) {
+        state.db = null;
+      }
+    }
+
+    async function loadSongs() {
+      const songs = loadLocalSongs();
+
+      if (state.db) {
+        try {
+          const q = query(collection(state.db, 'songs'), orderBy('createdAt', 'desc'));
+          const result = await getDocs(q);
+          result.forEach((docSnap) => {
+            const data = docSnap.data();
+            songs.push({ title: data.title || 'Untitled', notes: data.notes || [], createdAt: data.createdAt?.toDate?.() || new Date() });
+          });
+        } catch (error) {
+          hud.textContent = 'Firestore 取得に失敗したため、ローカル保存されている曲を表示します。';
+        }
+      }
+
+      state.songs = songs;
+      if (!state.songs.length) {
+        songSelect.innerHTML = '<option value="">保存済み曲がありません</option>';
+        return;
+      }
+
+      songSelect.innerHTML = '';
+      state.songs.forEach((song, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = song.title;
+        songSelect.appendChild(option);
+      });
+
+      songSelect.value = '0';
+      state.currentSong = state.songs[0];
+      state.index = 0;
+    }
+
+    function preloadAllAudios() {
+      Object.keys(NOTE_FILES).forEach((note) => {
+        if (!state.audioCache.has(note)) {
+          const audio = new Audio(`./${NOTE_FILES[note]}`);
+          audio.preload = 'auto';
+          audio.volume = 1;
+          audio.load();
+          state.audioCache.set(note, audio);
+        }
+      });
+      hud.textContent = '音源を事前読み込みしました。';
+    }
+
+    function getAudio(note) {
+      if (!state.audioCache.has(note)) {
+        const audio = new Audio(`./${NOTE_FILES[note]}`);
+        audio.preload = 'auto';
+        audio.volume = 1;
+        state.audioCache.set(note, audio);
+      }
+      return state.audioCache.get(note);
+    }
+
+    function playNote(note) {
+      const template = getAudio(note);
+      const audio = template.cloneNode();
+      audio.currentTime = 0;
+      audio.loop = false;
+      audio.volume = 1;
+      state.activeAudios.push(audio);
+      audio.play().catch(() => {});
+      violinWrap.classList.add('active');
+    }
+
+    function stopNoteFade() {
+      if (!state.activeAudios.length) {
+        violinWrap.classList.remove('active');
+        return;
+      }
+
+      if (state.fadeInterval) {
+        clearInterval(state.fadeInterval);
+      }
+
+      state.fadeInterval = setInterval(() => {
+        let stillPlaying = 0;
+        state.activeAudios = state.activeAudios.filter((audio) => {
+          if (!audio) return false;
+          if (audio.volume <= 0.03) {
+            audio.pause();
+            audio.currentTime = 0;
+            return false;
+          }
+          audio.volume = Math.max(0, audio.volume - 0.05);
+          stillPlaying += 1;
+          return true;
+        });
+
+        if (!stillPlaying) {
+          clearInterval(state.fadeInterval);
+          state.fadeInterval = null;
+          violinWrap.classList.remove('active');
+        }
+      }, 45);
+    }
+
+    function playNextNote() {
+      if (!state.currentSong || !state.currentSong.notes || !state.currentSong.notes.length) {
+        return;
+      }
+
+      const note = state.currentSong.notes[state.index];
+      if (!note) {
+        state.index = 0;
+        return;
+      }
+
+      playNote(note);
+      state.index += 1;
+    }
+
+    songSelect.addEventListener('change', () => {
+      const selected = Number(songSelect.value);
+      const song = state.songs[selected];
+      if (!song) return;
+      state.currentSong = song;
+      state.index = 0;
+      hud.textContent = `曲「${song.title}」を選択しました。画面を押して演奏してください。`;
+    });
+
+    playArea.addEventListener('pointerdown', (event) => {
+      if (event.pointerType !== 'touch' && event.button !== 0) return;
+      if (state.activePointerId !== null && state.activePointerId !== event.pointerId) return;
+      state.activePointerId = event.pointerId;
+      if (state.currentSong) {
+        playNextNote();
+      } else {
+        hud.textContent = '先に曲を選んでください。';
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      state.activePointerId = null;
+      stopNoteFade();
+    });
+
+    window.addEventListener('pointerleave', () => {
+      state.activePointerId = null;
+      stopNoteFade();
+    });
+
+    window.addEventListener('pointercancel', () => {
+      state.activePointerId = null;
+      stopNoteFade();
+    });
+
+    preloadAllAudios();
+    initFirebase().then(loadSongs);
+  </script>
+</body>
+</html>
