@@ -11,6 +11,7 @@
       background: linear-gradient(135deg, #eef2ff, #f8fafc);
       color: #111827;
       padding: 24px;
+      line-height: 1.5;
     }
 
     .container {
@@ -19,9 +20,16 @@
     }
 
     h1 {
-      font-size: 28px;
-      margin-bottom: 20px;
+      font-size: 32px;
+      margin-bottom: 8px;
       text-align: center;
+    }
+
+    .subtext {
+      text-align: center;
+      font-size: 16px;
+      margin-bottom: 18px;
+      color: #4b5563;
     }
 
     .link-list {
@@ -32,33 +40,37 @@
     .link-btn {
       display: block;
       width: 100%;
-      padding: 18px 20px;
-      border-radius: 16px;
+      padding: 20px 22px;
+      border-radius: 18px;
       background: linear-gradient(135deg, #2563eb, #1d4ed8);
       color: white;
       text-decoration: none;
-      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.2);
-      min-height: 90px;
+      box-shadow: 0 12px 28px rgba(37, 99, 235, 0.25);
+      min-height: 96px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: flex-start;
       box-sizing: border-box;
+      border: 3px solid #bfdbfe;
+      font-size: 18px;
     }
 
-    .link-btn:hover {
+    .link-btn:hover,
+    .link-btn:focus {
       transform: translateY(-2px);
-      box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+      box-shadow: 0 16px 32px rgba(37, 99, 235, 0.3);
+      outline: none;
     }
 
     .link-title {
       font-size: 22px;
-      font-weight: 700;
+      font-weight: 800;
       margin-bottom: 6px;
     }
 
     .link-url {
-      font-size: 14px;
+      font-size: 13px;
       opacity: 0.95;
       word-break: break-all;
     }
@@ -67,6 +79,7 @@
 <body>
   <div class="container">
     <h1>リンク集</h1>
+    <p class="subtext">下のボタンをタップすると、リンク先へ移動します。</p>
 
     <div class="link-list">
       <a class="link-btn" href="./mousetest.html">
@@ -94,9 +107,9 @@
         <span class="link-url">https://iidadaikigithub.github.io/pachinko/pachinko2.html</span>
       </a>
 
-      <a class="link-btn" href="https://iidadaikigithub.github.io/20yomiage.html">
+      <a class="link-btn" href="./hidariclick20yomiage.html">
         <span class="link-title">左クリックで読み上げ</span>
-        <span class="link-url">https://iidadaikigithub.github.io/20yomiage.html</span>
+        <span class="link-url">./hidariclick20yomiage.html</span>
       </a>
     </div>
   </div>

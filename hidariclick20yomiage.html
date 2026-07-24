@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>読み上げ</title>
+<style>
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  font-family: sans-serif; background: #f0f0f0;
+}
+#container {
+  max-width: 800px; margin: 0 auto; padding: 20px;
+}
+#spreadsheet-link {
+  position: fixed; top: 10px; right: 10px; z-index: 100;
+  background: #007bff; color: #fff; padding: 8px 14px;
+  border-radius: 8px; text-decoration: none; font-size: 0.85rem;
+  font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+#spreadsheet-link:hover { background: #005fcc; }
+#auto-read-toggle {
+  position: fixed; top: 10px; right: 150px; z-index: 101;
+  background: #28a745; color: #fff; padding: 8px 14px;
+  border-radius: 8px; border: none; font-size: 0.85rem;
+  font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+#auto-read-toggle.active {
+  background: #dc3545;
+}
+#auto-read-toggle:hover { background: #218838; }
+#auto-read-toggle.active:hover { background: #c82333; }
+#status {
+  text-align: center; font-size: 1rem; color: #666;
+  margin-bottom: 16px; min-height: 1.5em;
+}
+#controls {
+  text-align: center; margin-bottom: 16px;
+  background: #fff; border-radius: 12px; padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+#controls select {
+  font-size: 1rem; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid #ccc; max-width: 100%; margin-bottom: 10px;
+}
+.slider-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; margin-top: 6px; font-size: 0.9rem;
+}
+.slider-row input[type="range"] {
+  width: 120px; cursor: pointer;
+}
+.slider-row .val {
+  display: inline-block; width: 3em; font-weight: bold;
+  color: #007bff;
+}
+#frames {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.frame {
+  background: #fff; border: 3px solid #ccc;
+  border-radius: 16px; padding: 20px 24px;
+  font-size: 1.4rem; line-height: 1.8;
+  display: flex; align-items: center; gap: 16px;
+  transition: border-color 0.3s, background 0.3s;
+  cursor: pointer;
+  position: relative;
+  touch-action: manipulation;
+}
+.frame-indicator {
+  width: 8px;
+  align-self: stretch;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+  overflow: hidden;
+  display: none;
+  flex-shrink: 0;
+}
+.frame-indicator.active {
+  display: block;
+}
+.frame-indicator-bar {
+  width: 100%;
+  height: 0%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #ffb347, #ff4d4d);
+  transition: height 3s linear;
+}
+.frame-indicator.ready .frame-indicator-bar {
+  background: linear-gradient(180deg, #34d399, #10b981);
+}
+.frame.active {
+  border-color: #f00; background: #ffe0e0;
+  border-width: 5px; box-shadow: 0 0 12px rgba(255,0,0,0.3);
+}
+.frame.active.speaking .text-a {
+  animation: shake 0.15s infinite;
+}
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  50% { transform: translateX(2px); }
+  75% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+.frame.done {
+  border-color: #8c8; background: #e0ffe0;
+}
+.frame .text-a {
+  flex: 1;
+}
+.frame .memo-b {
+  color: red; font-weight: bold; font-size: 1rem;
+  white-space: pre-wrap; text-align: right;
+  max-width: 200px; flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+<button id="auto-read-toggle" type="button">自動読み上げ OFF</button>
+<a id="spreadsheet-link" href="https://docs.google.com/spreadsheets/d/1tT3k4c9g2rNDv8_n60KUUE5qbs3oSq0bwQQmADbBrgs/edit?gid=0#gid=0" target="_blank">スプレッドシート</a>
+<div id="container">
+  <div id="status">読み込み中...</div>
+  <div id="controls">
+    <select id="voice-select"></select>
+    <div class="slider-row">
+      <label>速さ</label>
+      <input type="range" id="rate-slider" min="0.5" max="2.0" step="0.1" value="1.0">
+      <span class="val" id="rate-val">1.0</span>
+    </div>
+    <div class="slider-row">
+      <label>高さ</label>
+      <input type="range" id="pitch-slider" min="0.5" max="2.0" step="0.1" value="1.0">
+      <span class="val" id="pitch-val">1.0</span>
+    </div>
+  </div>
+  <div id="frames"></div>
+</div>
+<script>
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/1tT3k4c9g2rNDv8_n60KUUE5qbs3oSq0bwQQmADbBrgs/export?format=csv&gid=0';
+
+let items = [];
+let currentIndex = 0;
+let cooldown = false;
+let selectedVoice = null;
+let cooldownTimer = null;
+let autoReadEnabled = false;
+let autoReadInProgress = false;
+let autoReadDelayTimer = null;
+let suppressNextClick = false;
+
+function parseCSV(text) {
+  const rows = [[]];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (inQuotes && text[i+1] === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === ',' && !inQuotes) {
+      rows[rows.length - 1].push(cur.trim());
+      cur = '';
+    } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+      if (ch === '\r' && text[i+1] === '\n') i++;
+      rows[rows.length - 1].push(cur.trim());
+      cur = '';
+      rows.push([]);
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur.length || rows.length === 0) {
+    if (rows.length === 0) rows.push([]);
+    rows[rows.length - 1].push(cur.trim());
+  }
+  if (rows.length > 0 && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') rows.pop();
+  return rows;
+}
+
+function selectFrame(index, shouldSpeak = false) {
+  const idx = Number(index);
+  if (idx === currentIndex) {
+    if (shouldSpeak) speakCurrent();
+    return;
+  }
+  currentIndex = idx;
+  updateFrames();
+  document.getElementById('status').textContent = (currentIndex + 1) + '/' + items.length + ' を選択中。タップまたはEnterで読み上げ';
+  if (shouldSpeak) speakCurrent();
+}
+
+function toggleAutoRead() {
+  autoReadEnabled = !autoReadEnabled;
+  const button = document.getElementById('auto-read-toggle');
+  button.textContent = autoReadEnabled ? '自動読み上げ ON' : '自動読み上げ OFF';
+  button.classList.toggle('active', autoReadEnabled);
+  const status = document.getElementById('status');
+  if (autoReadEnabled) {
+    status.textContent = '自動読み上げモード ON。左クリックで順番に再生';
+  } else {
+    stopAutoRead();
+    status.textContent = '自動読み上げモード OFF';
+  }
+}
+
+function stopAutoRead() {
+  autoReadInProgress = false;
+  if (autoReadDelayTimer) {
+    clearTimeout(autoReadDelayTimer);
+    autoReadDelayTimer = null;
+  }
+  if (speechSynthesis.speaking || speechSynthesis.pending) {
+    speechSynthesis.cancel();
+  }
+  const activeFrame = document.querySelector('.frame.speaking');
+  if (activeFrame) activeFrame.classList.remove('speaking');
+}
+
+function startAutoRead() {
+  if (!autoReadEnabled || autoReadInProgress || currentIndex >= items.length) return;
+  autoReadInProgress = true;
+  document.getElementById('status').textContent = '自動読み上げ開始...';
+  speakCurrent();
+}
+
+function renderFrames() {
+  const container = document.getElementById('frames');
+  container.innerHTML = '';
+  items.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'frame' + (i === 0 ? ' active' : '');
+    div.dataset.index = i;
+
+    const indicator = document.createElement('div');
+    indicator.className = 'frame-indicator';
+    const indicatorBar = document.createElement('div');
+    indicatorBar.className = 'frame-indicator-bar';
+    indicator.appendChild(indicatorBar);
+    div.appendChild(indicator);
+
+    const textA = document.createElement('div');
+    textA.className = 'text-a';
+    textA.textContent = item.a || '(テキストなし)';
+
+    const memoB = document.createElement('div');
+    memoB.className = 'memo-b';
+    memoB.textContent = item.b || '';
+
+    div.addEventListener('click', (e) => {
+      if (autoReadEnabled) {
+        return;
+      }
+      e.preventDefault();
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
+      selectFrame(div.dataset.index, true);
+    });
+    div.addEventListener('touchend', (e) => {
+      if (autoReadEnabled) {
+        return;
+      }
+      e.preventDefault();
+      suppressNextClick = true;
+      selectFrame(div.dataset.index, true);
+    });
+    div.appendChild(textA);
+    div.appendChild(memoB);
+    container.appendChild(div);
+  });
+}
+
+function clearCooldownIndicator() {
+  document.querySelectorAll('.frame-indicator').forEach(indicator => {
+    indicator.classList.remove('active', 'ready');
+    const bar = indicator.querySelector('.frame-indicator-bar');
+    if (bar) bar.style.height = '0%';
+  });
+  if (cooldownTimer) {
+    clearTimeout(cooldownTimer);
+    cooldownTimer = null;
+  }
+}
+
+function startCooldownIndicator() {
+  clearCooldownIndicator();
+  const activeFrame = document.querySelector('.frame.active');
+  if (!activeFrame) return;
+  const indicator = activeFrame.querySelector('.frame-indicator');
+  const bar = activeFrame.querySelector('.frame-indicator-bar');
+  if (!indicator || !bar) return;
+  indicator.classList.add('active');
+  bar.style.height = '0%';
+  requestAnimationFrame(() => {
+    if (bar.isConnected) bar.style.height = '100%';
+  });
+  cooldownTimer = window.setTimeout(() => {
+    indicator.classList.add('ready');
+  }, 3000);
+}
+
+function updateFrames() {
+  clearCooldownIndicator();
+  document.querySelectorAll('.frame').forEach(el => {
+    const i = parseInt(el.dataset.index);
+    el.className = 'frame';
+    if (i === currentIndex && i < items.length) el.classList.add('active');
+    if (i < currentIndex) el.classList.add('done');
+  });
+}
+
+function speakCurrent() {
+  speechSynthesis.cancel();
+  clearCooldownIndicator();
+  if (cooldownTimer) {
+    clearTimeout(cooldownTimer);
+    cooldownTimer = null;
+  }
+  cooldown = false;
+  if (currentIndex >= items.length) {
+    document.getElementById('status').textContent = 'すべての読み上げが完了しました';
+    return;
+  }
+  const text = items[currentIndex].a;
+  if (!text) {
+    currentIndex++;
+    updateFrames();
+    return;
+  }
+
+  cooldown = true;
+  const status = document.getElementById('status');
+  status.textContent = (currentIndex + 1) + '/' + items.length + ' 読み上げ中...';
+
+  const activeFrame = document.querySelector('.frame.active');
+  if (activeFrame) activeFrame.classList.add('speaking');
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'ja-JP';
+  utter.rate = parseFloat(document.getElementById('rate-slider').value);
+  utter.pitch = parseFloat(document.getElementById('pitch-slider').value);
+  if (selectedVoice) utter.voice = selectedVoice;
+  utter.onend = () => {
+    const was = document.querySelector('.frame.speaking');
+    if (was) was.classList.remove('speaking');
+    currentIndex++;
+    updateFrames();
+    startCooldownIndicator();
+    if (currentIndex < items.length && autoReadEnabled && autoReadInProgress) {
+      status.textContent = '1秒後に次を読み上げます...';
+      autoReadDelayTimer = window.setTimeout(() => {
+        speakCurrent();
+      }, 1000);
+    } else if (currentIndex < items.length) {
+      status.textContent = '次の枠に移動しました。専用スイッチかエンターボタンで読み上げ';
+      autoReadInProgress = false;
+    } else {
+      status.textContent = 'すべての読み上げが完了しました';
+      autoReadInProgress = false;
+    }
+    cooldownTimer = window.setTimeout(() => { cooldown = false; }, 3000);
+  };
+  utter.onerror = () => {
+    const was = document.querySelector('.frame.speaking');
+    if (was) was.classList.remove('speaking');
+    clearCooldownIndicator();
+    cooldown = false;
+    status.textContent = 'エラーが発生しました';
+  };
+  speechSynthesis.speak(utter);
+}
+
+function populateVoices() {
+  const select = document.getElementById('voice-select');
+  const voices = speechSynthesis.getVoices();
+  select.innerHTML = '';
+  if (voices.length === 0) {
+    const opt = document.createElement('option');
+    opt.textContent = 'デフォルト音声';
+    select.appendChild(opt);
+    return;
+  }
+  const jpVoices = voices.filter(v => v.lang && v.lang.startsWith('ja'));
+  const display = jpVoices.length > 0 ? jpVoices : voices;
+  display.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.voiceURI;
+    opt.textContent = v.name + ' (' + v.lang + ')';
+    select.appendChild(opt);
+  });
+  const match = display.find(v => v.voiceURI === (selectedVoice ? selectedVoice.voiceURI : null));
+  if (match) select.value = match.voiceURI;
+  else if (display.length > 0) select.value = display[0].voiceURI;
+  selectedVoice = display.find(v => v.voiceURI === select.value) || null;
+}
+document.getElementById('voice-select').addEventListener('change', (e) => {
+  const voices = speechSynthesis.getVoices();
+  selectedVoice = voices.find(v => v.voiceURI === e.target.value) || null;
+});
+document.getElementById('auto-read-toggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleAutoRead();
+});
+document.addEventListener('click', (e) => {
+  if (!autoReadEnabled || e.button !== 0) return;
+  if (e.target.closest('#auto-read-toggle, #spreadsheet-link, #controls')) return;
+  const frame = e.target.closest('.frame');
+  if (frame) {
+    selectFrame(Number(frame.dataset.index));
+  }
+  if (currentIndex >= items.length) return;
+  e.preventDefault();
+  startAutoRead();
+});
+document.getElementById('rate-slider').addEventListener('input', (e) => {
+  document.getElementById('rate-val').textContent = parseFloat(e.target.value).toFixed(1);
+});
+document.getElementById('pitch-slider').addEventListener('input', (e) => {
+  document.getElementById('pitch-val').textContent = parseFloat(e.target.value).toFixed(1);
+});
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = populateVoices;
+}
+
+async function loadCSV() {
+  const status = document.getElementById('status');
+  try {
+    const r = await fetch(CSV_URL, { cache: 'no-store' });
+    if (!r.ok) throw new Error('fetch failed: ' + r.status);
+    const text = await r.text();
+    const rows = parseCSV(text).filter(row => row.length >= 1);
+    items = rows.map(row => ({ a: row[0] || '', b: row[1] || '' }));
+    if (items.length === 0) {
+      status.textContent = 'データがありません';
+      return;
+    }
+    renderFrames();
+    status.textContent = 'タッチかエンターか専用スイッチで読み上げ';
+  } catch (e) {
+    status.textContent = 'CSV読み込みエラー: ' + e.message;
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'a' || e.key === 'b' || e.key === 'Enter') {
+    e.preventDefault();
+    speakCurrent();
+  }
+});
+
+populateVoices();
+loadCSV();
+
+function primeSpeech() {
+  if (!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance('');
+  u.volume = 0;
+  speechSynthesis.speak(u);
+  setTimeout(() => speechSynthesis.cancel(), 100);
+}
+primeSpeech();
+</script>
+</body>
+</html>
