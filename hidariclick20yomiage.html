@@ -19,18 +19,18 @@ html, body {
   font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 #spreadsheet-link:hover { background: #005fcc; }
-#auto-read-toggle {
+#click-mode-toggle {
   position: fixed; top: 10px; right: 150px; z-index: 101;
   background: #28a745; color: #fff; padding: 8px 14px;
   border-radius: 8px; border: none; font-size: 0.85rem;
   font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   cursor: pointer;
 }
-#auto-read-toggle.active {
+#click-mode-toggle.active {
   background: #dc3545;
 }
-#auto-read-toggle:hover { background: #218838; }
-#auto-read-toggle.active:hover { background: #c82333; }
+#click-mode-toggle:hover { background: #218838; }
+#click-mode-toggle.active:hover { background: #c82333; }
 #status {
   text-align: center; font-size: 1rem; color: #666;
   margin-bottom: 16px; min-height: 1.5em;
@@ -118,7 +118,7 @@ html, body {
 </style>
 </head>
 <body>
-<button id="auto-read-toggle" type="button">自動読み上げ OFF</button>
+<button id="click-mode-toggle" type="button">左クリックモード OFF</button>
 <a id="spreadsheet-link" href="https://docs.google.com/spreadsheets/d/1tT3k4c9g2rNDv8_n60KUUE5qbs3oSq0bwQQmADbBrgs/edit?gid=0#gid=0" target="_blank">スプレッドシート</a>
 <div id="container">
   <div id="status">読み込み中...</div>
@@ -145,9 +145,9 @@ let currentIndex = 0;
 let cooldown = false;
 let selectedVoice = null;
 let cooldownTimer = null;
-let autoReadEnabled = false;
-let autoReadInProgress = false;
-let autoReadDelayTimer = null;
+let clickModeEnabled = false;
+let clickBlocked = false;
+let clickBlockTimer = null;
 let suppressNextClick = false;
 
 function parseCSV(text) {
@@ -191,38 +191,31 @@ function selectFrame(index, shouldSpeak = false) {
   if (shouldSpeak) speakCurrent();
 }
 
-function toggleAutoRead() {
-  autoReadEnabled = !autoReadEnabled;
-  const button = document.getElementById('auto-read-toggle');
-  button.textContent = autoReadEnabled ? '自動読み上げ ON' : '自動読み上げ OFF';
-  button.classList.toggle('active', autoReadEnabled);
+function toggleClickMode() {
+  clickModeEnabled = !clickModeEnabled;
+  const button = document.getElementById('click-mode-toggle');
+  button.textContent = clickModeEnabled ? '左クリックモード ON' : '左クリックモード OFF';
+  button.classList.toggle('active', clickModeEnabled);
   const status = document.getElementById('status');
-  if (autoReadEnabled) {
-    status.textContent = '自動読み上げモード ON。左クリックで順番に再生';
+  if (clickModeEnabled) {
+    status.textContent = '左クリックモード ON。画面を左クリックすると順次再生します';
   } else {
-    stopAutoRead();
-    status.textContent = '自動読み上げモード OFF';
+    stopClickMode();
+    status.textContent = '左クリックモード OFF';
   }
 }
 
-function stopAutoRead() {
-  autoReadInProgress = false;
-  if (autoReadDelayTimer) {
-    clearTimeout(autoReadDelayTimer);
-    autoReadDelayTimer = null;
+function stopClickMode() {
+  if (clickBlockTimer) {
+    clearTimeout(clickBlockTimer);
+    clickBlockTimer = null;
   }
+  clickBlocked = false;
   if (speechSynthesis.speaking || speechSynthesis.pending) {
     speechSynthesis.cancel();
   }
   const activeFrame = document.querySelector('.frame.speaking');
   if (activeFrame) activeFrame.classList.remove('speaking');
-}
-
-function startAutoRead() {
-  if (!autoReadEnabled || autoReadInProgress || currentIndex >= items.length) return;
-  autoReadInProgress = true;
-  document.getElementById('status').textContent = '自動読み上げ開始...';
-  speakCurrent();
 }
 
 function renderFrames() {
@@ -249,7 +242,7 @@ function renderFrames() {
     memoB.textContent = item.b || '';
 
     div.addEventListener('click', (e) => {
-      if (autoReadEnabled) {
+      if (clickModeEnabled) {
         return;
       }
       e.preventDefault();
@@ -260,7 +253,7 @@ function renderFrames() {
       selectFrame(div.dataset.index, true);
     });
     div.addEventListener('touchend', (e) => {
-      if (autoReadEnabled) {
+      if (clickModeEnabled) {
         return;
       }
       e.preventDefault();
@@ -349,17 +342,10 @@ function speakCurrent() {
     currentIndex++;
     updateFrames();
     startCooldownIndicator();
-    if (currentIndex < items.length && autoReadEnabled && autoReadInProgress) {
-      status.textContent = '1秒後に次を読み上げます...';
-      autoReadDelayTimer = window.setTimeout(() => {
-        speakCurrent();
-      }, 1000);
-    } else if (currentIndex < items.length) {
-      status.textContent = '次の枠に移動しました。専用スイッチかエンターボタンで読み上げ';
-      autoReadInProgress = false;
+    if (currentIndex < items.length) {
+      status.textContent = '次の左クリックで再生します。1秒待ちです';
     } else {
       status.textContent = 'すべての読み上げが完了しました';
-      autoReadInProgress = false;
     }
     cooldownTimer = window.setTimeout(() => { cooldown = false; }, 3000);
   };
@@ -391,29 +377,38 @@ function populateVoices() {
     opt.textContent = v.name + ' (' + v.lang + ')';
     select.appendChild(opt);
   });
+  const defaultVoice = display.find(v => v.name && v.name.includes('Google') && v.lang && v.lang.startsWith('ja'))
+    || display.find(v => v.lang === 'ja-JP')
+    || display[0];
   const match = display.find(v => v.voiceURI === (selectedVoice ? selectedVoice.voiceURI : null));
   if (match) select.value = match.voiceURI;
-  else if (display.length > 0) select.value = display[0].voiceURI;
+  else if (defaultVoice) select.value = defaultVoice.voiceURI;
   selectedVoice = display.find(v => v.voiceURI === select.value) || null;
 }
 document.getElementById('voice-select').addEventListener('change', (e) => {
   const voices = speechSynthesis.getVoices();
   selectedVoice = voices.find(v => v.voiceURI === e.target.value) || null;
 });
-document.getElementById('auto-read-toggle').addEventListener('click', (e) => {
+document.getElementById('click-mode-toggle').addEventListener('click', (e) => {
   e.stopPropagation();
-  toggleAutoRead();
+  toggleClickMode();
 });
 document.addEventListener('click', (e) => {
-  if (!autoReadEnabled || e.button !== 0) return;
-  if (e.target.closest('#auto-read-toggle, #spreadsheet-link, #controls')) return;
-  const frame = e.target.closest('.frame');
-  if (frame) {
-    selectFrame(Number(frame.dataset.index));
+  if (!clickModeEnabled || e.button !== 0) return;
+  if (e.target.closest('#click-mode-toggle, #spreadsheet-link, #controls')) return;
+  if (clickBlocked) return;
+  if (currentIndex >= items.length) {
+    document.getElementById('status').textContent = 'すべての読み上げが完了しました';
+    return;
   }
-  if (currentIndex >= items.length) return;
   e.preventDefault();
-  startAutoRead();
+  clickBlocked = true;
+  if (clickBlockTimer) clearTimeout(clickBlockTimer);
+  clickBlockTimer = window.setTimeout(() => {
+    clickBlocked = false;
+    clickBlockTimer = null;
+  }, 1000);
+  speakCurrent();
 });
 document.getElementById('rate-slider').addEventListener('input', (e) => {
   document.getElementById('rate-val').textContent = parseFloat(e.target.value).toFixed(1);
@@ -438,7 +433,7 @@ async function loadCSV() {
       return;
     }
     renderFrames();
-    status.textContent = 'タッチかエンターか専用スイッチで読み上げ';
+    status.textContent = '左クリックモードボタンを押すと、画面全体の左クリックで順次再生します';
   } catch (e) {
     status.textContent = 'CSV読み込みエラー: ' + e.message;
   }
