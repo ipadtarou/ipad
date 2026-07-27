@@ -326,7 +326,7 @@
     });
 
     playArea.addEventListener('pointerdown', (event) => {
-      if (event.pointerType !== 'touch' && event.button !== 0) return;
+      if (event.button > 0) return;
       if (state.activePointerId !== null && state.activePointerId !== event.pointerId) return;
       state.activePointerId = event.pointerId;
       if (state.currentSong) {
